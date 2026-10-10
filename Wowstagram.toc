@@ -1,0 +1,27 @@
+## Interface: 16001, 120100
+## Title: Wowstagram
+## Notes: Instagram for your character: put yourself in the picture, change the outfit, strike a pose, add a filter, share it with the realm or your guild. Likes, comments, follows. /wgram to open.
+## Author: FlintarN
+## Version: 1.0.0
+## SavedVariables: WowstagramDB
+## IconTexture: Interface\AddOns\Wowstagram\Art\Logo
+
+Core\Init.lua
+Core\Net.lua
+Core\Look.lua
+Core\Social.lua
+Core\Bots.lua
+UI\Widgets.lua
+UI\Fx.lua
+UI\Decor.lua
+UI\Picture.lua
+UI\Scroller.lua
+UI\Feed.lua
+UI\Studio.lua
+UI\Post.lua
+UI\Profile.lua
+UI\Search.lua
+UI\Activity.lua
+UI\Settings.lua
+UI\Minimap.lua
+UI\Main.lua

@@ -52,7 +52,7 @@ function PR.New(parent, key)
             -- Done saves what's in the box (as Enter does).
             if view.editing then S.SetBio(view.bioBox:GetText() or "") end
             view.editing = not view.editing
-            if view.editing then view.bioBox:SetText(ns.db.me.bio or "") view.bioBox:SetFocus() end
+            if view.editing then view.bioBox:SetText(ns.my.me.bio or "") view.bioBox:SetFocus() end
             view:Refresh()
         end)
         view.editButton:SetPoint("LEFT", view.name, "RIGHT", 20, 0)
@@ -195,7 +195,7 @@ function PR.New(parent, key)
             .. " followers|r      "
         if self.mine then
             local n = 0
-            for _ in pairs(ns.db.following) do n = n + 1 end
+            for _ in pairs(ns.my.following) do n = n + 1 end
             counts = counts .. B(n) .. W.Hex(C.dim) .. " following|r"
         else
             counts = counts .. B(likes) .. W.Hex(C.dim) .. " likes|r"

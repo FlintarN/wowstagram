@@ -192,21 +192,16 @@ local DEFAULTS = {
     posts = {},       -- newest first; see Core\Social.lua for the shape
     tombs = {},       -- deleted posts and comments, so a sync can't bring them back
     profiles = {},    -- id -> { class, race, level, guild, bio, t }
-    following = {},   -- id -> time you followed them
-    me = { bio = "" },
     saved = {},       -- post id -> time you bookmarked it
     unsaved = {},     -- post id -> time you took the bookmark off (kept a while, in case it was a slip)
     faceTune = {},    -- (development) face filter corrections tuned on /wgram wall
     blocked = {},     -- id -> when you blocked them: their pictures and comments are hidden
     met = {},         -- id -> when you last saw them (nameplates, target, group, chat nearby)
-    myComments = {},  -- "post id:time" -> fingerprint of each comment you wrote (to vouch for it)
-    myLikes = {},     -- post id -> your like's time (minus: taken back), to vouch for it
     strikes = {},     -- id -> { n = points, t = when }: caught faking (Social)
     users = {},       -- id -> when their addon last sent you anything (they have Wowstagram)
     softTombs = {},   -- "p:id" / "c:id:author:t" -> { t, from }: a deletion passed on by someone else (Social)
     faceObs = {},     -- (development) what the camera saw for each tuned face
     seen = {},        -- post id -> true once you've looked at it (story rings)
-    activity = {},    -- likes and comments on your pictures, newest first
     minimap = true,
     minimapAngle = 220,
     sound = true,
@@ -214,6 +209,18 @@ local DEFAULTS = {
     network = true,   -- join the hidden realm channel and share posts
     demo = false,     -- practice: demo people with their own posts (Settings)
     scale = 1,
+}
+
+-- Per character (ns.my = WowstagramDB.chars[id]): what's about you as
+-- this character. Everything else (pictures, profiles, settings, saved,
+-- blocked...) is shared by all your characters.
+local CHAR_DEFAULTS = {
+    me = { bio = "", t = 0 },
+    following = {},   -- id -> time you followed them
+    activity = {},    -- likes and comments on your pictures, newest first
+    unread = 0,
+    myComments = {},  -- "post id:time" -> fingerprint of each comment you wrote (to vouch for it)
+    myLikes = {},     -- post id -> your like's time (minus: taken back), to vouch for it
 }
 
 local function ApplyDefaults(db, defaults)
@@ -231,14 +238,53 @@ local function ApplyDefaults(db, defaults)
     end
 end
 
+-- This character's own data (ns.my). An older copy of the addon kept it
+-- for the whole account: it goes to the character it belongs to, the one
+-- who posted pictures here (or the first to log in, if nobody did).
+local OLD_CHAR_KEYS = { "me", "following", "activity", "unread", "myComments", "myLikes" }
+function ns.LoadCharacter()
+    local db = ns.db
+    db.chars = db.chars or {}
+    local id = ns.Me()
+    local c = db.chars[id]
+    if not c then
+        c = {}
+        db.chars[id] = c
+        if db.me ~= nil and not db.charsClaimed then
+            local mine, anyone = false, false
+            for _, p in ipairs(db.posts or {}) do
+                if not p.bot then
+                    anyone = true
+                    if p.author == id then mine = true end
+                end
+            end
+            if mine or not anyone then
+                for _, k in ipairs(OLD_CHAR_KEYS) do c[k] = db[k] end
+                c.since, c.forgotBefore = db.since, db.forgotBefore
+                db.charsClaimed = true
+            end
+        end
+    end
+    if db.charsClaimed then
+        for _, k in ipairs(OLD_CHAR_KEYS) do db[k] = nil end
+        db.since, db.forgotBefore = nil, nil
+    end
+    ApplyDefaults(c, CHAR_DEFAULTS)
+    -- When this character started keeping a record of its things (to vouch
+    -- for them); a claimed record from an older copy may have gaps.
+    c.since = c.since or ns.Now()
+    ns.my = c
+end
+
 -- Settings, "Clear everything": every post, profile and follow forgotten.
 -- The switches stay as they are.
-local DATA = { "posts", "tombs", "profiles", "following", "me", "unread", "saved", "unsaved", "blocked", "met", "myComments", "myLikes", "strikes", "users", "softTombs", "seen", "activity" }
+local DATA = { "posts", "tombs", "profiles", "saved", "unsaved", "blocked", "met", "strikes", "users", "softTombs", "seen", "chars" }
 function ns.ResetAll()
     for _, k in ipairs(DATA) do ns.db[k] = nil end
     ApplyDefaults(ns.db, DEFAULTS)
+    ns.LoadCharacter()
     -- (Anything of yours from before now can't be vouched for: Social.)
-    ns.db.forgotBefore = ns.Now()
+    ns.my.forgotBefore = ns.Now()
     if ns.Bots then ns.Bots:Sync() end
     ns.Changed()
 end
@@ -251,19 +297,13 @@ ns.On("ADDON_LOADED", function(name)
         WowstagramDB.v1 = true
     end
     ns.db = WowstagramDB
-    -- When this computer started keeping your things (to vouch for them):
-    -- an older copy of the addon kept no list of your comments and likes,
-    -- so those from before can't be vouched for.
-    if not WowstagramDB.since then
-        WowstagramDB.since = ns.Now()
-        if WowstagramDB.posts and #WowstagramDB.posts > 0 then WowstagramDB.forgotBefore = ns.Now() end
-    end
     -- v2: players are "Name-Realm" ids. Data from before can't be matched up.
     if not WowstagramDB.v2 then
         for _, k in ipairs(DATA) do WowstagramDB[k] = nil end
         WowstagramDB.v2 = true
     end
     ApplyDefaults(WowstagramDB, DEFAULTS)
+    ns.LoadCharacter()
     WowstagramDB.drafts = nil -- (Create no longer keeps a draft)
 
     ns.Net:Init()

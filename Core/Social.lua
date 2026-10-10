@@ -325,7 +325,7 @@ function S.People()
         for name, t in pairs(p.likes or {}) do if t > 0 then set[name] = true end end
     end
     for name in pairs(ns.db.profiles) do set[name] = true end
-    for name in pairs(ns.db.following) do set[name] = true end
+    for name in pairs(ns.my.following) do set[name] = true end
     for name in pairs(ns.db.users) do set[name] = true end
     set[ns.Me()] = nil
     local out = {}
@@ -369,7 +369,7 @@ end
 -- filter: "all", "guild", "following", or a name (that person's posts).
 function S.List(filter)
     local out = {}
-    local follow = ns.db.following
+    local follow = ns.my.following
     for _, p in ipairs(ns.db.posts) do
         if S.Blocked(p.author) then
             -- (hidden)
@@ -442,7 +442,7 @@ end
 function S.Profile(name)
     if name == ns.Me() then
         local p = S.MyProfile()
-        p.bio = ns.db.me.bio
+        p.bio = ns.my.me.bio
         return p
     end
     return ns.db.profiles[name] or {}
@@ -452,7 +452,7 @@ function S.MyProfile()
     local _, class = UnitClass("player")
     return {
         class = class, race = MyRace(), raceName = UnitRace("player"), level = UnitLevel and UnitLevel("player") or 0,
-        guild = GetGuildInfo and GetGuildInfo("player") or "", bio = ns.db.me.bio or "", t = ns.db.me.t or 0,
+        guild = GetGuildInfo and GetGuildInfo("player") or "", bio = ns.my.me.bio or "", t = ns.my.me.t or 0,
     }
 end
 
@@ -497,7 +497,7 @@ local function AskRoster()
 end
 
 function S.Following(name)
-    return ns.db.following[name] ~= nil
+    return ns.my.following[name] ~= nil
 end
 
 -- Saved (the bookmark): only on this computer, nobody sees what you save.
@@ -728,7 +728,7 @@ S.MAX_ACTIVITY = 100
 local function Activity(kind, who, post, text)
     if who == ns.Me() or S.Blocked(who) then return end
     if kind ~= "mention" and not S.IsMine(post) then return end
-    local log = ns.db.activity
+    local log = ns.my.activity
     table.insert(log, 1, { t = ns.Now(), kind = kind, who = who, id = post.id, text = text })
     while #log > S.MAX_ACTIVITY do table.remove(log) end
     if ns.db.notify then
@@ -1164,8 +1164,17 @@ function S.SetNetwork(on)
     ns.Changed()
 end
 
+-- Your profile in the shared list too, so your other characters see it.
+function S.KeepOwnProfile()
+    local p = S.MyProfile()
+    p.seen = ns.Now()
+    ns.db.profiles[ns.Me()] = p
+    ns.db.users[ns.Me()] = ns.Now()
+end
+
 function S:Init()
-    ns.db.me.t = ns.db.me.t or 0
+    ns.my.me.t = ns.my.me.t or 0
+    ns.On("PLAYER_LOGIN", S.KeepOwnProfile)
     ns.On("FRIENDLIST_UPDATE", S.RefreshFriends)
     ns.On("BN_FRIEND_INFO_CHANGED", S.RefreshFriends)
     ns.On("PLAYER_LOGIN", function()
@@ -1325,13 +1334,14 @@ end
 
 function S.Follow(name, on)
     if name == ns.Me() then return end
-    ns.db.following[name] = on and ns.Now() or nil
+    ns.my.following[name] = on and ns.Now() or nil
     ns.Changed()
 end
 
 function S.SetBio(text)
-    ns.db.me.bio = Clean(text, S.MAX_BIO)
-    ns.db.me.t = ns.Now()
+    ns.my.me.bio = Clean(text, S.MAX_BIO)
+    ns.my.me.t = ns.Now()
+    S.KeepOwnProfile()
     SendProfile()
     ns.Changed()
 end
@@ -1368,12 +1378,12 @@ end
 -- after a Clear everything): only those can be vouched for (or denied).
 function S.Vouchable(t)
     t = math.abs(tonumber(t) or 0)
-    return t >= (ns.db.since or 0) and t >= (ns.db.forgotBefore or 0)
+    return t >= (ns.my.since or 0) and t >= (ns.my.forgotBefore or 0)
 end
 
 S.MAX_MINE = 3000
 function S.RememberMine(kind, key, value)
-    local list = kind == "c" and ns.db.myComments or ns.db.myLikes
+    local list = kind == "c" and ns.my.myComments or ns.my.myLikes
     list[key] = value
     S.mineCount = (S.mineCount or 0) + 1
     if S.mineCount % 100 == 0 then S.PruneMine() end
@@ -1382,7 +1392,7 @@ end
 -- Over S.MAX_MINE: the oldest go (comments by their time, likes by theirs).
 function S.PruneMine()
     for _, kind in ipairs({ "c", "l" }) do
-        local list = kind == "c" and ns.db.myComments or ns.db.myLikes
+        local list = kind == "c" and ns.my.myComments or ns.my.myLikes
         local all = {}
         for k, v in pairs(list) do
             local t = kind == "c" and tonumber(k:match(":(%-?%d+)$")) or math.abs(tonumber(v) or 0)
@@ -1396,7 +1406,7 @@ function S.PruneMine()
 end
 
 function S.MyLikeIs(id, t)
-    local mine = ns.db.myLikes[id]
+    local mine = ns.my.myLikes[id]
     if mine then return mine == t end
     return not S.Vouchable(t)
 end
@@ -1405,7 +1415,7 @@ end
 -- one passed on by someone else is unconfirmed and checked.
 function S.TakeComment(id, c, sender)
     if c.author == ns.Me() then
-        local mine = ns.db.myComments[id .. ":" .. c.t]
+        local mine = ns.my.myComments[id .. ":" .. c.t]
         if (mine and mine ~= S.CommentPrint(c)) or (not mine and S.Vouchable(c.t)) then
             S.Strike(sender, 3, "a made-up comment in your name")
             return nil
@@ -1515,7 +1525,7 @@ Net.On("V", function(sender, data, chatType)
             elseif S.Vouchable(t or (post and post.t)) then a = "0" end
         elseif kind == "c" and t then
             local key = id .. ":" .. t
-            local mine = ns.db.myComments[key]
+            local mine = ns.my.myComments[key]
             if ns.db.tombs["c:" .. id .. ":" .. ns.Me() .. ":" .. t] then a = "D"
             elseif mine then
                 if mine == print then a = "1" else
@@ -1531,7 +1541,7 @@ Net.On("V", function(sender, data, chatType)
                 end
             elseif S.Vouchable(t) then a = "0" end
         elseif kind == "l" and t then
-            local mine = ns.db.myLikes[id]
+            local mine = ns.my.myLikes[id]
             if mine then a = (mine == t) and "1" or ("3:" .. mine)
             elseif S.Vouchable(t) then a = "0" end
         end

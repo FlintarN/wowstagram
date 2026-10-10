@@ -44,7 +44,7 @@ function A.New(parent)
     view.empty:SetText("Activity on your pictures shows up here:\nlikes and comments.")
 
     function view:Refresh()
-        local log = ns.db.activity
+        local log = ns.my.activity
         for i, e in ipairs(log) do
             local row = self.list:Row(i)
             row.entry = e

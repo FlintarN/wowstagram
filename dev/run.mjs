@@ -384,7 +384,7 @@ await BK.run(`
   local readable = false
   for key in pairs(post.dislikes) do if key:find("Grumpy", 1, true) then readable = true end end
   check(not readable, "nobody can read who disliked")
-  check(ns.db.activity[1] == nil or ns.db.activity[1].kind ~= "dislike", "and nobody is told")
+  check(ns.my.activity[1] == nil or ns.my.activity[1].kind ~= "dislike", "and nobody is told")
   S.Like(post.id, true, "Grumpy Gus")
   check(S.Dislikes(post) == 0 and S.Likes(post) == 2, "liking takes the dislike back")
   S.Dislike(post.id, true, "Happy Hal")
@@ -469,7 +469,7 @@ await FS.run(`
   -- Mentioned in someone's comment: a notification.
   ns.Net.Receive("Best Friend", "P:91:1/1@Best Friend#" .. ns.Net.PROTO .. ":" .. table.concat({ "men1", "Best Friend", "", "",
     tostring(now), "0", "1", "look @Feed Ranker here", "", "" }, string.char(31)), "CHANNEL")
-  local a = ns.db.activity[1]
+  local a = ns.my.activity[1]
   check(a and a.kind == "mention" and a.who == "Best Friend", "mentioned in a caption: a notification")
 `);
 
@@ -495,6 +495,37 @@ await GL.run(`
   local s = ns.Studio.view
   check(s.look.slots[5] and s.look.slots[5].item == 16706 and #s.look.people == 0 and s.look.pose == "wave",
     "Try this look: their outfit on you, on your own")
+`);
+
+section('Your characters: each its own bio, follows, notifications');
+const ALT = await Player('Zal Arer');
+await ALT.run(`
+  local S = ns.Social
+  S.SetNetwork(false)
+  S.SetBio("Night elf, day dreamer")
+  S.Follow("Some Star", true)
+  S.Post("1", "Zal's picture")
+  -- Log in on another character of the same account.
+  PLAYER_NAME = "Trick Ky"
+  ns.LoadCharacter()
+  check(ns.Me() == "Trick Ky" and ns.my.me.bio == "", "Trick has his own (empty) bio, not Zal's")
+  check(not S.Following("Some Star"), "and his own follows")
+  local zal = S.Profile("Zal Arer")
+  check(zal and zal.bio == "Night elf, day dreamer", "Zal's profile, bio and all, seen from Trick")
+  check(#S.List("Zal Arer") == 1, "Zal's pictures are shared")
+  PLAYER_NAME = "Zal Arer"
+  ns.LoadCharacter()
+  check(ns.my.me.bio == "Night elf, day dreamer" and S.Following("Some Star"), "back on Zal: all still there")
+  -- An older copy kept these for the whole account: they go to the one who posted.
+  ns.db.chars = nil
+  ns.db.charsClaimed = nil
+  ns.db.me, ns.db.following = { bio = "old bio", t = 1 }, { ["Old Follow"] = 1 }
+  PLAYER_NAME = "Trick Ky"
+  ns.LoadCharacter()
+  check(ns.my.me.bio == "" and ns.db.me ~= nil, "an alt who never posted doesn't take the old bio")
+  PLAYER_NAME = "Zal Arer"
+  ns.LoadCharacter()
+  check(ns.my.me.bio == "old bio" and ns.my.following["Old Follow"] and ns.db.me == nil, "the one who posted gets it")
 `);
 
 section('Selfie');
@@ -695,7 +726,7 @@ await A.run(`
   local p = ns.Social.Find(POST_ID)
   check(ns.Social.Likes(p) == 1 and ns.Social.Liked(p, "Mira Dawnfeather"), "A sees B's like")
   check(#p.comments == 1 and p.comments[1].text == "Looking sharp!", "A sees B's comment")
-  check((ns.db.unread or 0) == 0 or ns.UI.tab ~= "profile", "unread counted")
+  check((ns.my.unread or 0) == 0 or ns.UI.tab ~= "profile", "unread counted")
   local told = 0
   for _, line in ipairs(CHAT) do if line:find("liked your picture") or line:find("commented") then told = told + 1 end end
   check(told == 2, "A told about the like and the comment: " .. told)
@@ -1256,10 +1287,10 @@ await D.run(`
   local p = ns.Social.Find(MY_POST)
   check(ns.Social.Likes(p) >= 2, "demo people like your picture: " .. ns.Social.Likes(p))
   check(#p.comments >= 1, "and comment")
-  check(#ns.db.activity >= 3 and (ns.db.unread or 0) >= 3, "notifications logged: " .. #ns.db.activity)
+  check(#ns.my.activity >= 3 and (ns.my.unread or 0) >= 3, "notifications logged: " .. #ns.my.activity)
   ns.UI:Show("activity")
   local av = ns.UI.pages.activity.view
-  check(ns.db.unread == 0 and av.list.rows[1]:IsShown(), "Notifications page lists them and clears the count")
+  check(ns.my.unread == 0 and av.list.rows[1]:IsShown(), "Notifications page lists them and clears the count")
   av.list.rows[1]:GetScript("OnMouseUp")(av.list.rows[1])
   check(ns.UI.tab == "post" and ns.UI.arg == MY_POST, "a notification opens the picture")
   local bot = nil
@@ -1479,7 +1510,7 @@ await B.run(`
   check(v.editing and v.bioBox:IsShown(), "Edit profile opens the bio box")
   v.bioBox:SetText("Mage by day, murloc by night")
   v.editButton:GetScript("OnClick")(v.editButton)
-  check(ns.db.me.bio == "Mage by day, murloc by night" and not v.editing, "Done saves the bio")
+  check(ns.my.me.bio == "Mage by day, murloc by night" and not v.editing, "Done saves the bio")
 `);
 await Tick(0.5, 6);
 await A.run(`
@@ -1537,7 +1568,7 @@ section('Clear everything');
 await D.run(`
   ns.Social.Follow("Someone Else", true)
   ns.ResetAll()
-  check(#ns.db.posts == 0 and next(ns.db.following) == nil, "cleared")
+  check(#ns.db.posts == 0 and next(ns.my.following) == nil, "cleared")
   check(ns.db.demo == false and ns.db.network == true, "switches kept")
 `);
 

@@ -47,7 +47,7 @@ function UI:Select(key, arg)
     end
     self.tab = key
     self.arg = arg
-    if key == "activity" then ns.db.unread = 0 end
+    if key == "activity" then ns.my.unread = 0 end
     for k, page in pairs(self.pages) do page.frame:SetShown(k == key) end
     local page = self.pages[key]
     if page.view.Open then page.view:Open(arg) end
@@ -79,8 +79,8 @@ end
 
 -- Someone liked or commented on your picture.
 function UI:Ping()
-    ns.db.unread = (ns.db.unread or 0) + 1
-    if self.frame and self.frame:IsShown() and self.tab == "activity" then ns.db.unread = 0 end
+    ns.my.unread = (ns.my.unread or 0) + 1
+    if self.frame and self.frame:IsShown() and self.tab == "activity" then ns.my.unread = 0 end
     W.PlaySound("IG_QUEST_LIST_SELECT")
     self:Refresh()
 end
@@ -334,7 +334,7 @@ function UI:Refresh()
     local on = (self.tab == "post" or self.tab == "person") and self.back or self.tab
     for _, b in ipairs(self.nav) do
         b:SetSelected(b.key == on)
-        if b.key == "activity" then b:SetCount(ns.db.unread or 0) end
+        if b.key == "activity" then b:SetCount(ns.my.unread or 0) end
         if b.avatar then b.avatar:SetPlayer(ns.Me(), select(2, UnitClass("player"))) end
     end
     if not self.frame:IsShown() then return end

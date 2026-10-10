@@ -44,6 +44,7 @@ Add a caption, choose **Guild only** if you like, and **Share**.
 - **The look**: every item in a picture, with tooltips. **Try this look** puts it on you.
 - **Save to computer**: any picture, as a clean screenshot.
 - **Block** anyone: their pictures, comments, likes and dislikes disappear for you.
+- **Your characters**: each has its own profile, bio, follows and notifications, and sees the others' profiles. Pictures, settings, saved pictures and blocked people are shared by all of them.
 
 ## How it works
 

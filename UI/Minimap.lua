@@ -48,7 +48,7 @@ function M:Build()
     end)
     b:SetScript("OnDragStop", function(s) s:SetScript("OnUpdate", nil) end)
     W.Tooltip(b, ns.TITLE, function()
-        local n = ns.db.unread or 0
+        local n = ns.my.unread or 0
         return "Click to open. Drag to move this button." .. (n > 0 and ("\n|cffff6080" .. n .. " new likes and comments.|r") or "")
     end)
     Place(b)

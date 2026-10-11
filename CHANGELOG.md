@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.1
+
+- Each of your characters has its own profile, bio, follows and notifications (an alt no longer shows your main's bio).
+- Safer network: a message only counts as from someone when it really is them, and passed-on likes, dislikes and checks are limited.
+- Colour and link codes are taken out of captions and comments.
+- Mentioning the same person twice makes two proper links.
+- Back returns to the same profile or picture; a picture opens scrolled to the top; the "..." menu closes when you scroll.
+- Pictures use less CPU once they've loaded.
+
 ## 1.0.0
 
 The first release: Instagram for your WoW character, on Retail and WoW Forever.
@@ -28,8 +37,6 @@ The first release: Instagram for your WoW character, on Retail and WoW Forever.
 - Other people show as themselves when your game can see them, otherwise as a stand-in or a look-alike of their race (the badge says which).
 - **Nothing made up lasts**: passed-on pictures, comments and likes are checked with their owner in the background; fakes vanish, and whoever made them up is shut out after a few.
 - Built for busy realms: a few players answer each login, every sender is rate-limited, and old pictures make way for new ones (yours and your saved ones are always kept; friends' and followed people's have their own room).
-
-- Each of your characters has its own profile, bio, follows and notifications.
 
 ### Also
 - Fullscreen, window size, sounds, a chat line for likes and comments, a minimap button.

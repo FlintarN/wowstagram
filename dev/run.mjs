@@ -1338,10 +1338,25 @@ await D.run(`
   local bot = nil
   for _, q in ipairs(ns.db.posts) do if q.bot then bot = q break end end
   check(bot.comments[#bot.comments].author == bot.author, "the demo person answers")
+  ns.Social.Follow(bot.author, true)
+  ns.Social.Save(bot.id, true)
+  check(ns.Social.Following(bot.author), "you can follow a demo person")
   ns.Bots.SetEnabled(false)
+  check(not ns.Social.Following(bot.author), "the follow goes with them")
+  check(not ns.db.saved[bot.id], "and the bookmark")
   for _, q in ipairs(ns.db.posts) do check(not q.bot, "demo posts removed") end
   local p = ns.Social.Find(MY_POST)
   check(ns.Social.Likes(p) == 0 and #p.comments == 0, "their likes and comments removed")
+  local left = 0
+  for _, a in ipairs(ns.my.activity) do if ns.Bots.Is(a.who) then left = left + 1 end end
+  check(left == 0 and (ns.my.unread or 0) == 0, "their notifications removed")
+  for name in pairs(ns.my.following) do check(not ns.Bots.Is(name), "no follows of demo people left") end
+  local prof = false
+  for name in pairs(ns.db.profiles) do if ns.Bots.Is(name) then prof = true end end
+  check(not prof, "their profiles removed")
+  local mine = 0
+  for k in pairs(ns.my.myComments) do if k:find(bot.id, 1, true) then mine = mine + 1 end end
+  check(mine == 0, "no records of your comments on their posts")
 `);
 for (const p of [A, B, C]) {
   await p.run(`

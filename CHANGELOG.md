@@ -1,5 +1,9 @@
 # Changelog
 
+## Next
+
+- Switching the demo people off removes every trace of them: their notifications, your follows and bookmarks of them, and their profiles.
+
 ## 1.0.2
 
 - Each of your characters has its own profile, bio, follows and notifications (an alt no longer shows your main's bio).

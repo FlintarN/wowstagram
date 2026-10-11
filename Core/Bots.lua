@@ -106,18 +106,48 @@ local function Seed()
     end
 end
 
--- Remove everything the demo people did.
+-- Remove everything the demo people did, and every trace of them: their
+-- posts, likes, comments and profiles, the notifications they caused, your
+-- follows, bookmarks and records of them (on all your characters).
 local function Clear()
-    local posts = ns.db.posts
-    for i = #posts, 1, -1 do
-        if posts[i].bot then table.remove(posts, i) end
+    local db = ns.db
+    local gone = {} -- their post ids
+    for i = #db.posts, 1, -1 do
+        if db.posts[i].bot then
+            gone[db.posts[i].id] = true
+            table.remove(db.posts, i)
+        end
     end
-    for _, p in ipairs(posts) do
+    for _, p in ipairs(db.posts) do
         for name in pairs(p.likes or {}) do
             if B.Is(name) then p.likes[name] = nil end
         end
         for i = #(p.comments or {}), 1, -1 do
-            if p.comments[i].bot then table.remove(p.comments, i) end
+            local c = p.comments[i]
+            if c.bot or B.Is(c.author) then table.remove(p.comments, i) end
+        end
+    end
+    for name in pairs(B.BY_NAME) do db.profiles[name] = nil end
+    for _, t in ipairs({ db.saved, db.unsaved, db.seen, db.tombs }) do
+        for id in pairs(gone) do t[id] = nil end
+    end
+    for _, c in pairs(db.chars or {}) do
+        for name in pairs(c.following or {}) do
+            if B.Is(name) then c.following[name] = nil end
+        end
+        local log, unread = c.activity or {}, 0
+        for i = #log, 1, -1 do
+            if B.Is(log[i].who) or gone[log[i].id] then
+                if i <= (c.unread or 0) then unread = unread + 1 end
+                table.remove(log, i)
+            end
+        end
+        c.unread = math.max(0, (c.unread or 0) - unread)
+        for id in pairs(c.myLikes or {}) do
+            if gone[id] then c.myLikes[id] = nil end
+        end
+        for key in pairs(c.myComments or {}) do
+            if gone[key:match("^(.-):[^:]*$") or key] then c.myComments[key] = nil end
         end
     end
 end

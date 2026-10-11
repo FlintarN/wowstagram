@@ -2,7 +2,7 @@
 ## Title: Wowstagram
 ## Notes: Instagram for your character: put yourself in the picture, change the outfit, strike a pose, add a filter, share it with the realm or your guild. Likes, comments, follows. /wgram to open.
 ## Author: FlintarN
-## Version: 1.0.1
+## Version: 1.0.2
 ## SavedVariables: WowstagramDB
 ## IconTexture: Interface\AddOns\Wowstagram\Art\Logo
 

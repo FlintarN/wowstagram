@@ -1376,8 +1376,16 @@ end
 -- like as it really is, ? can't say (from before they kept a record).
 -- Offline: asked again later, or when they say hello.
 ---------------------------------------------------------------------------
+-- A fingerprint, compared between clients: never change how it's worked out
+-- (older versions would see every picture as changed).
 local function Hash36(s)
-    return ns.Look.B36(Hash(s)) .. ns.Look.B36(Hash("#" .. s))
+    local h1, h2 = 5381, 52711
+    for i = 1, #s do
+        local b = s:byte(i)
+        h1 = (h1 * 33 + b) % 4294967296
+        h2 = (h2 * 31 + b) % 4294967296
+    end
+    return ns.Look.B36(h1) .. ns.Look.B36(h2)
 end
 
 function S.PostPrint(post)

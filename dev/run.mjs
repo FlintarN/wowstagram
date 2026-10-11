@@ -202,11 +202,30 @@ await A.run(`
   look.bg = "gr_cobble"
   pic:Restyle()
   check(pic.art[1]._tex == 187099 and pic.art[1]:IsShown(), "ground: a tiled texture (by file id)")
-  look.bg = "lq_lava"
+  look.bg = "lava"
   pic:Restyle()
   local first = pic.art[1]._tex
   Pump(pic.fx.layer, 0.5)
   check(first == 219795 and pic.art[1]._tex ~= first, "lava flows (its frames play)")
+  -- 1.0.0 pictures: "lava" and "ocean" were (and stay) the moving liquids.
+  -- Fingerprints are compared with 1.0.0 clients: worked out the same way.
+  do
+    local s = table.concat({ "1;pwave", "hi", 1000, 0 }, string.char(31))
+    local h1, h2 = 5381, 52711
+    for i = 1, #s do
+      local b = s:byte(i)
+      h1 = (h1 * 33 + b) % 4294967296
+      h2 = (h2 * 31 + b) % 4294967296
+    end
+    check(ns.Social.PostPrint({ look = "1;pwave", caption = "hi", t = 1000, edited = 0 }) == ns.Look.B36(h1) .. ns.Look.B36(h2),
+      "a picture's fingerprint as in 1.0.0")
+  end
+  check(ns.Look.BACKGROUND.lava.frames and ns.Look.BACKGROUND.ocean.frames and ns.Look.BACKGROUND.magma.top, "background keys as in 1.0.0")
+  do
+    local keys, dup = {}, nil
+    for _, b in ipairs(ns.Look.BACKGROUNDS) do if keys[b.key] then dup = b.key end; keys[b.key] = true end
+    check(not dup, "every background has its own key" .. (dup and (": " .. dup) or ""))
+  end
   look.bg = "elwynn"
   pic:Restyle()
   check(not pic.art[1]:IsShown(), "a studio colour has no picture")

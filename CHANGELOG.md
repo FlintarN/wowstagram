@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.0.1
+## 1.0.2
 
 - Each of your characters has its own profile, bio, follows and notifications (an alt no longer shows your main's bio).
 - Safer network: a message only counts as from someone when it really is them, and passed-on likes, dislikes and checks are limited.
@@ -8,6 +8,7 @@
 - Mentioning the same person twice makes two proper links.
 - Back returns to the same profile or picture; a picture opens scrolled to the top; the "..." menu closes when you scroll.
 - Pictures use less CPU once they've loaded.
+- Works side by side with 1.0.0: pictures, likes, comments and backgrounds look the same to both.
 
 ## 1.0.0
 

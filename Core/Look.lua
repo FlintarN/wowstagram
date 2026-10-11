@@ -25,7 +25,7 @@
 -- (numbers in slots are base 36 to keep pictures short). Each extra person
 -- is one token, "q" and their own fields joined by "/", with "n<name>":
 -- "q nBob-Realm/r4/g3/cDRUID/pwave/m20,0/s1=a12x".
-local ADDON, ns = ...
+local _, ns = ...
 
 local L = {}
 ns.Look = L
@@ -808,9 +808,7 @@ function L.Decode(str)
                 local top, bottom = v:match("^(%x%x%x%x%x%x)(%x%x%x%x%x%x)$")
                 if top then look.bgTop, look.bgBottom = top:lower(), bottom:lower() end
             elseif k == "x" then
-                if L.FILTER[v] then look.filter = v
-                elseif L.MOTION[v] then look.motion = v -- (motions were filters at first)
-                elseif L.BACKGROUND[v] then look.bg = v end -- (v0.1 had backgrounds as filters)
+                if L.FILTER[v] then look.filter = v end
             elseif k == "q" then
                 if #look.people < L.MAX_PEOPLE - 1 then
                     local p = L.NewPerson()

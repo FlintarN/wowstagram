@@ -8,7 +8,7 @@
 -- UI\Picture.lua calls Fx.Setup once per picture and Fx.Apply whenever the
 -- look changes. Only pictures that move get an OnUpdate, and frames that
 -- aren't shown don't run it.
-local ADDON, ns = ...
+local _, ns = ...
 
 local Fx = {}
 ns.Fx = Fx

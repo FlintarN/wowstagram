@@ -1,7 +1,7 @@
 -- Notifications: who liked or commented on your pictures, newest first.
 -- Click a line to open the picture. Opening the page clears the red count on
 -- the sidebar.
-local ADDON, ns = ...
+local _, ns = ...
 
 local W = ns.Widgets
 local C = W.C

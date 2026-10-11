@@ -20,12 +20,8 @@ They only work with `ns.DEV = true` in `Core\Init.lua` (never in a release):
 | `/wgram reset` | Move the window back to the middle of the screen |
 | `/wgram stats` | Traffic over the last minute, people online, and anything dropped |
 | `/wgram debug` | Print addon messages sent and received |
-| `/wgram probe` | List which 3D-model features this game client has |
 | `/wgram wall` | Every race, men and women, side by side: Full / Waist up / Face, outfits, poses, and Tune faces (place the face filters by hand; saved, to fit `P.FACE_MODEL` again) |
 | `/wgram cvars <word>` | Game settings with that word in their name, and their values |
-| `/wgram placeholders` | The dressed look-alike bodies, race by race |
-| `/wgram racetest` | Can this game client draw a race and dress it? |
-| `/wgram boxes` | What WoW says about model sizes |
 
 ## Architecture
 
@@ -36,7 +32,7 @@ They only work with `ns.DEV = true` in `Core\Init.lua` (never in a release):
 | `Core\Look.lua` | What a picture is: the look table, its string, and the slot, pose, framing and filter lists |
 | `Core\Social.lua` | Posts, likes, comments, follows, profiles, the hello and sync, and tombstones |
 | `Core\Bots.lua` | Demo people (local only, `post.bot = true`) |
-| `UI\Picture.lua` | The 3D picture widget. Also has the item helpers (slot for an item, icon, equipped) and `/wgram probe` |
+| `UI\Picture.lua` | The 3D picture widget. Also has the item helpers (slot for an item, icon, equipped) |
 | `UI\Widgets.lua` | The look: colours (`W.C`, Instagram's dark theme), fonts (`W.Font`, `W.Text`; the logo uses `Fonts\MORPHEUS.TTF`), `W.Rounded` (nine slices of `Art\Round`), `W.Flat` buttons (primary, secondary, light, link, plain, danger), `W.Glyph` icon buttons, `W.Avatar` (with story ring), `W.Input`, `W.Toggle`, `W.Tabs`, `W.Menu` |
 | `UI\Main.lua` | The WoW window with the logo beside the portrait; a black content area; the sidebar; navigation (`UI:Show(key, arg)`; the `post` and `person` pages have Back). Page size: `UI.MAIN_W` x `UI.MAIN_H` |
 | `UI\Feed.lua` (Home), `Studio.lua` (Create), `Post.lua`, `Profile.lua`, `Activity.lua` (Notifications), `Settings.lua`, `Minimap.lua` | The pages |

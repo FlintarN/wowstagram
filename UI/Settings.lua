@@ -1,6 +1,6 @@
 -- Settings: plain rows with on/off switches, like the app's settings list.
 -- Every switch can be flipped back any time.
-local ADDON, ns = ...
+local _, ns = ...
 
 local W = ns.Widgets
 local C = W.C

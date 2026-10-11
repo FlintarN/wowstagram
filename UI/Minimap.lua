@@ -1,5 +1,5 @@
 -- Minimap button: the camera logo on the minimap's edge. Click to open, drag to move.
-local ADDON, ns = ...
+local _, ns = ...
 
 local W = ns.Widgets
 local M = {}

@@ -8,7 +8,7 @@
 -- sets for the same classes (ids checked in ItemTree's Forever data),
 -- so they draw on any client. Their pictures show on YOUR character, as any
 -- picture does when its owner isn't nearby (see UI\Picture.lua).
-local ADDON, ns = ...
+local _, ns = ...
 
 local B = {}
 ns.Bots = B

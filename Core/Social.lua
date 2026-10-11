@@ -19,7 +19,7 @@
 -- tells us). Pictures that pass through a sync are new to us, so they can't
 -- be checked that way: a modified addon could still invent a post. It's a
 -- toy network, like HearthPhone's.
-local ADDON, ns = ...
+local _, ns = ...
 
 local Net = ns.Net
 local S = {}

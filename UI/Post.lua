@@ -3,7 +3,7 @@
 -- comments, the heart / comment / save row, the likes, when, every piece of
 -- the outfit (hover for the item: shop the look), and "Add a comment".
 -- Your own pictures can be edited or deleted from the menu.
-local ADDON, ns = ...
+local _, ns = ...
 
 local W = ns.Widgets
 local C = W.C

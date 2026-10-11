@@ -3,7 +3,7 @@
 -- Instagram's desktop site: black, thin grey lines, white text, blue for the
 -- one thing to press, grey for the rest, and line icons (Art\*, made by
 -- dev/make_art.py).
-local ADDON, ns = ...
+local _, ns = ...
 
 local W = {}
 ns.Widgets = W
@@ -63,13 +63,6 @@ function W.Text(parent, size, color, face, layer)
     fs:SetTextColor(color[1], color[2], color[3], 1)
     fs:SetJustifyH("LEFT")
     fs:SetText("")
-    return fs
-end
-
--- Old helpers, still used here and there.
-function W.Label(parent, text, font)
-    local fs = parent:CreateFontString(nil, "OVERLAY", font or "GameFontNormal")
-    fs:SetText(text or "")
     return fs
 end
 

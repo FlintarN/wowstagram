@@ -7,7 +7,7 @@
 -- UI\Picture.lua makes pic.decor (above the filter, under the badge) and
 -- calls Decor.Apply whenever the look changes. Create's previews use
 -- Decor.DrawFrame and Decor.DrawText on their tiles.
-local ADDON, ns = ...
+local _, ns = ...
 
 local D = {}
 ns.Decor = D

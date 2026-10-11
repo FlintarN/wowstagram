@@ -12,7 +12,7 @@
 -- gender is around: a bare NPC look of their race, wearing only the
 -- separate pieces (helm, shoulders, cloak, weapons); WoW won't paint body
 -- clothes onto an NPC (see /wgram racetest).
-local ADDON, ns = ...
+local _, ns = ...
 
 local W = ns.Widgets
 local L = ns.Look
@@ -31,9 +31,8 @@ P.DiagFov = DiagFov
 
 -- A bare NPC look per race and gender (UnitRace id; 2 = male, 3 = female as
 -- UnitSex gives it): skin painted, no clothes of their own. From WoW's
--- creature display tables (wago.tools): CreatureDisplayInfoExtra with an HD
--- skin and no NPCModelItemSlotDisplayInfo rows. Mostly one matching set
--- (37913-37928), gaps filled from another (20317-20323).
+-- creature display tables: CreatureDisplayInfoExtra with an HD skin and no
+-- NPCModelItemSlotDisplayInfo rows.
 local RACE_LOOK = {
     [1] = { 37925, 37926 },  -- Human
     [2] = { 37920, 55256 },  -- Orc
@@ -57,7 +56,7 @@ local RACE_LIKE = {
 -- On a stranger's race body only the separate pieces go on: helm,
 -- shoulders, cloak and weapons attach in full colour; body clothes (chest,
 -- legs, boots...) are painted onto a real player's skin, which an NPC body
--- can't do, and they come out wrong (/wgram racetest, 2026-10-09).
+-- can't do.
 P.ATTACHED = { [1] = true, [3] = true, [15] = true, [16] = true, [17] = true }
 
 -- A unit to stand in for someone of gender `sex` (UnitSex: 2 male, 3
@@ -83,12 +82,10 @@ function P.Donor(sex)
     end
 end
 
--- How to draw someone the game doesn't know: { unit, race } (a stand-in)
--- or { display } (the plain race body).
 -- Dressed placeholders: NPC looks of each player race and sex, already wearing
 -- robes / cloth / leather / mail / plate (pre-painted), with no helm, shoulders or
 -- cloak of their own, so a stranger's real ones go on top. Picked from WoW's
--- creature display tables (wago.tools) by armour type of the NPC's items.
+-- creature display tables by the armour type of the NPC's items.
 -- [race] = { [2] = male, [3] = female } (UnitSex numbers).
 P.PLACEHOLDER = {
     [1] = { -- Human
@@ -277,7 +274,7 @@ function P.HeadSize(race, frame)
     return row and row[frame == "waist" and 2 or 1] or 1
 end
 
--- Full shots, tuned by eye on /wgram wall: < 1 closer, > 1 further out.
+-- Full shots, per race and sex: < 1 closer, > 1 further out.
 -- [race] = { man, woman }.
 local FULL_FIT = {
     [1] = { 0.9, 1 }, [3] = { 0.9, 1 }, [4] = { 0.9, 1 }, [5] = { 0.9, 1 }, [6] = { 0.9, 1.1 },
@@ -292,11 +289,8 @@ end
 -- (from its feet): ze the eyes' height, s the head's size (as the filters
 -- are drawn), fwd how far forward of the body's middle the head sits (a
 -- hunched Tauren's is far forward: near the camera it looks bigger and
--- further from the middle), xs sideways. Worked out on 2026-10-10 from
--- faces placed by hand in three framings on /wgram wall (Tune faces; men on
--- NPC look-alikes, women on stand-ins): within a few pixels in each.
--- (Tuned with HD character models on WoW Forever. SD models would need a
--- table of their own: see dev/NOTES.md.)
+-- further from the middle), xs sideways. Fitted from faces placed by hand
+-- in three framings (Tune faces on /wgram wall), with HD character models.
 P.FACE_MODEL = {
     ["1:2"] = { ze = 0.857, s = 0.125, fwd = 0.086, xs = 0.001 }, -- Human man
     ["1:3"] = { ze = 0.902, s = 0.130, fwd = 0.059, xs = -0.007 }, -- Human woman
@@ -795,7 +789,7 @@ function P.New(parent, w, h, opts)
         end
         if scene.SetCameraFieldOfView then scene:SetCameraFieldOfView(DiagFov(fov, pw, ph - ct - cb)) end
         -- Moved in the picture (right-drag in Create): the camera goes the
-        -- other way. Screen right is world +y here (seen in game); up is +z.
+        -- other way. Screen right is world +y here; up is +z.
         local viewH = 2 * d * math.tan(FOV / 2)
         local viewW = ph > 0 and viewH * pw / ph or viewH
         local panY = -(look.mx or 0) * viewW
@@ -1596,249 +1590,6 @@ end)
 ns.On("GROUP_ROSTER_UPDATE", Recheck)
 
 ---------------------------------------------------------------------------
--- /wgram probe: which model features this client has.
----------------------------------------------------------------------------
-function P.Probe()
-    local ok, scene = pcall(CreateFrame, "ModelScene", nil, UIParent)
-    local actor = ok and scene and scene.CreateActor and scene:CreateActor()
-    local function Has(obj, name) return (obj and obj[name]) and "|cff40ff40yes|r" or "|cffff5050no|r" end
-    ns.Print("ModelScene: " .. (actor and "|cff40ff40yes|r" or "|cffff5050no|r"))
-    for _, m in ipairs({ "SetModelByUnit", "Undress", "TryOn", "SetItemTransmogInfo", "GetItemTransmogInfoList",
-        "SetAnimation", "SetYaw", "SetDesaturation", "GetActiveBoundingBox", "SetCustomRace" }) do
-        ns.Print("  actor:" .. m .. " " .. Has(actor, m))
-    end
-    ns.Print("  ItemUtil.CreateItemTransmogInfo " .. Has(ItemUtil, "CreateItemTransmogInfo"))
-    ns.Print("  C_TransmogCollection.GetItemInfo " .. Has(C_TransmogCollection, "GetItemInfo"))
-    ns.Print("  C_TransmogCollection.GetSourceInfo " .. Has(C_TransmogCollection, "GetSourceInfo"))
-    local ok2, dm = pcall(CreateFrame, "DressUpModel", nil, UIParent)
-    ns.Print("  DressUpModel:SetCustomRace " .. Has(ok2 and dm, "SetCustomRace"))
-    if scene then scene:Hide() end
-    if ok2 and dm then dm:Hide() end
-end
-
----------------------------------------------------------------------------
--- /wgram racetest: can this client draw a race (not a unit) and dress it?
--- Round 1 (2026-10-09): a bare race body file takes the gear's shapes but
--- everything is white (nothing paints a body without appearance settings).
--- Round 2: player-race NPC looks, whose skin comes pre-painted
--- (CreatureDisplayInfoExtra with an HD bake and no clothes of their own;
--- found in wago.tools' tables). Night Elf woman: 37919 and 30737.
----------------------------------------------------------------------------
-local NE_F = { 37919, 30737 }
-
-function P.RaceTest()
-    if P.raceTest then
-        P.raceTest:Hide()
-        local shown = P.raceTestOpen
-        P.raceTest, P.raceTestOpen = nil, nil
-        if shown then return end
-    end
-    P.raceTestOpen = true
-    local f = CreateFrame("Frame", "WowstagramRaceTest", UIParent)
-    f:SetSize(1000, 430)
-    f:SetPoint("CENTER")
-    f:SetFrameStrata("DIALOG")
-    W.Fill(f, W.C.bg, 0.95)
-    f:EnableMouse(true)
-    f:SetMovable(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", f.StartMoving)
-    f:SetScript("OnDragStop", f.StopMovingOrSizing)
-    local title = W.Text(f, 13)
-    title:SetPoint("TOP", 0, -10)
-    title:SetText("Race test, round 6: 1-2: does your race change? 3-4: does your gender change, still dressed?")
-    local close = W.Glyph(f, "Close", 14, function() f:Hide() end)
-    close:SetPoint("TOPRIGHT", -6, -6)
-
-    local items = {}
-    for _, slot in ipairs({ 1, 3, 5, 7, 8, 10, 15, 16 }) do
-        local link = GetInventoryItemLink and GetInventoryItemLink("player", slot)
-        if link then items[#items + 1] = link end
-    end
-    -- Your appearances, read from your own model (for the transmog way).
-    local mineList
-    do
-        local ok, sc = pcall(CreateFrame, "ModelScene", nil, f)
-        if ok and sc then
-            sc:SetSize(1, 1)
-            sc:SetPoint("BOTTOMLEFT")
-            local a = sc:CreateActor()
-            a:SetModelByUnit("player", true, true)
-            ns.After(0.5, function()
-                local ok2, list = pcall(a.GetItemTransmogInfoList, a)
-                if ok2 then mineList = list end
-            end)
-        end
-    end
-
-    local function Panel(i, label)
-        local p = CreateFrame("Frame", nil, f)
-        p:SetSize(230, 340)
-        p:SetPoint("TOPLEFT", 14 + (i - 1) * 246, -40)
-        W.Fill(p, W.C.surface)
-        W.Outline(p)
-        local t = W.Text(p, 11, W.C.dim)
-        t:SetPoint("BOTTOM", 0, -40)
-        t:SetWidth(230)
-        t:SetJustifyH("CENTER")
-        t:SetText(i .. ". " .. label)
-        return p
-    end
-
-    local function TryOn(target)
-        for _, link in ipairs(items) do
-            if target.TryOn then pcall(target.TryOn, target, link) end
-        end
-    end
-    local function Transmog(actor)
-        if not (mineList and actor.SetItemTransmogInfo) then return TryOn(actor) end
-        for slot, info in pairs(mineList) do
-            if type(info) == "table" and (info.appearanceID or 0) > 0 then
-                pcall(actor.SetItemTransmogInfo, actor, info, slot, slot ~= 16)
-            end
-        end
-    end
-
-    local function Scene(i, display, label, dress)
-        local p = Panel(i, label)
-        local ok, sc = pcall(CreateFrame, "ModelScene", nil, p)
-        if not ok or not sc then return end
-        sc:SetAllPoints()
-        local a = sc:CreateActor()
-        if sc.SetCameraFieldOfView then sc:SetCameraFieldOfView(0.62) end
-        sc:SetCameraOrientationByYawPitchRoll(math.pi, 0, 0)
-        sc:SetCameraPosition(4.2, 0, 1.0)
-        a:SetModelByCreatureDisplayID(display)
-        if dress then
-            local function Go()
-                if a.Undress then pcall(a.Undress, a) end
-                dress(a)
-            end
-            ns.After(0.4, Go)
-            ns.After(1.2, Go)
-        end
-    end
-    -- Round 6: does this client have customRaceID (Retail 11.2.5+)? And a
-    -- last fair try at the other gender's body file, swapped in after a
-    -- moment, of YOUR race. HD body files from the community listfile.
-    local BODY = { -- race id = { male, female }
-        [1] = { 1011653, 1000764 }, [2] = { 917116, 949470 }, [3] = { 878772, 950080 }, [4] = { 974343, 921844 },
-        [5] = { 959310, 997378 }, [6] = { 968705, 986648 }, [7] = { 900914, 940356 }, [8] = { 1022938, 1018060 },
-    }
-    local _, _, myRace = UnitRace("player")
-    local mySex = UnitSex("player")
-    local other = BODY[myRace or 1] or BODY[1]
-    local otherFile = mySex == 3 and other[1] or other[2]
-    local otherWord = mySex == 3 and "MAN" or "WOMAN"
-    local function Scene(i, label, build)
-        local p = Panel(i, label)
-        local ok, sc = pcall(CreateFrame, "ModelScene", nil, p)
-        if not ok or not sc then return end
-        sc:SetAllPoints()
-        local a = sc:CreateActor()
-        if sc.SetCameraFieldOfView then sc:SetCameraFieldOfView(0.62) end
-        sc:SetCameraOrientationByYawPitchRoll(math.pi, 0, 0)
-        sc:SetCameraPosition(5.2, 0, 1.0)
-        pcall(build, a)
-    end
-    local TAUREN, GNOME = 6, 7
-    local pickA = myRace == TAUREN and GNOME or TAUREN
-    Scene(1, "You as a " .. (pickA == TAUREN and "Tauren" or "Gnome") .. " (customRaceID): does your RACE change?",
-        function(a) a:SetModelByUnit("player", true, true, false, true, false, pickA) end)
-    Scene(2, "You as a Human (customRaceID 1)",
-        function(a) a:SetModelByUnit("player", true, true, false, true, false, myRace == 1 and 3 or 1) end)
-    local function Swap(i, label, kind)
-        local p = Panel(i, label)
-        local ok, m = pcall(CreateFrame, kind, nil, p)
-        if not ok or not m then return end
-        m:SetAllPoints()
-        pcall(m.SetUnit, m, "player", false, false)
-        ns.After(0.6, function()
-            pcall(m.SetModel, m, otherFile)
-            ns.After(0.4, function() if m.Dress then pcall(m.Dress, m) end end)
-        end)
-    end
-    Swap(3, "DressUpModel: you, then (a moment later) a " .. otherWord .. " body of your race", "DressUpModel")
-    Swap(4, "PlayerModel: the same", "PlayerModel")
-    P.raceTest = f
-end
-
----------------------------------------------------------------------------
--- /wgram placeholders: look through the dressed placeholders, race by race
--- (men on top, women below; robe, cloth, leather, mail, plate), to spot a
--- bad pick. Each panel says its display id.
----------------------------------------------------------------------------
-local RACE_ORDER = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 22 }
-local RACE_ORDER_CLASSIC = { 1, 2, 3, 4, 5, 6, 7, 8, 9 }
-local RACE_NAME = { [1] = "Human", [2] = "Orc", [3] = "Dwarf", [4] = "Night Elf", [5] = "Undead", [6] = "Tauren",
-    [7] = "Gnome", [8] = "Troll", [9] = "Goblin", [10] = "Blood Elf", [11] = "Draenei", [22] = "Worgen" }
-local STYLES = { "robe", "cloth", "leather", "mail", "plate" }
-
-function P.PlaceholderReview()
-    if P.review then return P.review:SetShown(not P.review:IsShown()) end
-    local f = CreateFrame("Frame", "WowstagramPlaceholders", UIParent)
-    f:SetSize(5 * 150 + 30, 2 * 230 + 80)
-    f:SetPoint("CENTER")
-    f:SetFrameStrata("DIALOG")
-    W.Fill(f, W.C.bg, 0.95)
-    f:EnableMouse(true)
-    f:SetMovable(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", f.StartMoving)
-    f:SetScript("OnDragStop", f.StopMovingOrSizing)
-    local close = W.Glyph(f, "Close", 14, function() f:Hide() end)
-    close:SetPoint("TOPRIGHT", -6, -6)
-    local title = W.Text(f, 14)
-    title:SetPoint("TOP", 0, -12)
-    local index = 1
-    local RACE_ORDER = ns.FOREVER and RACE_ORDER_CLASSIC or RACE_ORDER
-
-    local panels = {}
-    for row, sex in ipairs({ 2, 3 }) do
-        for col, style in ipairs(STYLES) do
-            local p = CreateFrame("Frame", nil, f)
-            p:SetSize(140, 200)
-            p:SetPoint("TOPLEFT", 15 + (col - 1) * 150, -40 - (row - 1) * 230)
-            local pic = P.New(p, 140, 175)
-            pic:SetPoint("TOPLEFT")
-            local label = W.Text(p, 10, W.C.dim)
-            label:SetPoint("TOP", pic, "BOTTOM", 0, -4)
-            label:SetWidth(146)
-            label:SetJustifyH("CENTER")
-            panels[#panels + 1] = { sex = sex, style = style, pic = pic, label = label }
-        end
-    end
-
-    local function Show()
-        local race = RACE_ORDER[index]
-        title:SetText(RACE_NAME[race] .. "  (" .. index .. " / " .. #RACE_ORDER .. ")   men on top, women below")
-        for _, p in ipairs(panels) do
-            local set = P.Placeholders()[race]
-            local id = set and set[p.sex][p.style]
-            if id then
-                p.pic:ShowDisplay(id)
-                p.label:SetText(p.style .. "  " .. id)
-            else
-                p.pic:Clear("none")
-                p.label:SetText(p.style .. "  (none)")
-            end
-        end
-    end
-    local prev = W.Flat(f, "<", 40, 26, "secondary", function()
-        index = (index - 2) % #RACE_ORDER + 1
-        Show()
-    end, 14)
-    prev:SetPoint("BOTTOMLEFT", 15, 12)
-    local nextB = W.Flat(f, ">", 40, 26, "secondary", function()
-        index = index % #RACE_ORDER + 1
-        Show()
-    end, 14)
-    nextB:SetPoint("BOTTOMRIGHT", -15, 12)
-    Show()
-    P.review = f
-end
-
----------------------------------------------------------------------------
 -- Save to computer: addons can't write image files, but they can take a
 -- WoW screenshot. The picture is shown big on black, with who posted it and
 -- the caption, the rest of the interface is hidden for a moment, and the
@@ -1929,6 +1680,9 @@ end
 -- /wgram wall: every race, men and women, side by side, to check framing.
 -- One outfit on everyone (the demo people's, in turn) and one framing.
 ---------------------------------------------------------------------------
+local RACE_ORDER = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 22 }
+local RACE_NAME = { [1] = "Human", [2] = "Orc", [3] = "Dwarf", [4] = "Night Elf", [5] = "Undead", [6] = "Tauren",
+    [7] = "Gnome", [8] = "Troll", [9] = "Goblin", [10] = "Blood Elf", [11] = "Draenei", [22] = "Worgen" }
 local WALL_FRAMES = { "full", "waist", "face" }
 function P.Wall()
     if P.wall then return P.wall:SetShown(not P.wall:IsShown()) end
@@ -2078,54 +1832,4 @@ function P.Wall()
     gridB:SetPoint("RIGHT", nextPose, "LEFT", -8, 0)
     Show()
     P.wall = f
-end
-
----------------------------------------------------------------------------
--- /wgram boxes: what WoW says about model sizes, to frame placeholders
--- right. Loads you, a Gnome man and an Orc man placeholder, and prints every
--- box WoW offers for each, two seconds later.
----------------------------------------------------------------------------
-function P.Boxes()
-    local ok, sc = pcall(CreateFrame, "ModelScene", nil, UIParent)
-    if not ok or not sc then return ns.Print("No ModelScene here.") end
-    sc:SetSize(200, 250)
-    sc:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
-    sc:SetAlpha(0.01)
-    local tests = {
-        { "you", function(a) a:SetModelByUnit("player", true, true, false, true) end },
-        { "gnome man " .. tostring(P.Placeholder(7, 2, "robe")),
-          function(a) a:SetModelByCreatureDisplayID(P.Placeholder(7, 2, "robe")) end },
-        { "orc man " .. tostring(P.Placeholder(2, 2, "cloth")),
-          function(a) a:SetModelByCreatureDisplayID(P.Placeholder(2, 2, "cloth")) end },
-    }
-    local actors = {}
-    for i, t in ipairs(tests) do
-        local a = sc:CreateActor()
-        pcall(t[2], a)
-        if a.SetAnimation then a:SetAnimation(0, 0, 1) end
-        actors[i] = a
-    end
-    local function Box(a, fn)
-        if not a[fn] then return "n/a" end
-        local okb, x1, y1, z1, x2, y2, z2 = pcall(a[fn], a)
-        if not okb or not x1 then return "nil" end
-        return string.format("z %.2f..%.2f, y %.2f..%.2f, x %.2f..%.2f", z1, z2, y1, y2, x1, x2)
-    end
-    ns.After(2, function()
-        for i, t in ipairs(tests) do
-            local a = actors[i]
-            ns.Print("|cffffd100" .. t[1] .. "|r  scale " .. tostring(a.GetScale and a:GetScale())
-                .. ", center origin " .. tostring(a.IsUsingCenterForOrigin and a:IsUsingCenterForOrigin())
-                .. ", collision bounds " .. tostring(a.IsPreferringModelCollisionBounds and a:IsPreferringModelCollisionBounds()))
-            ns.Print("   active: " .. Box(a, "GetActiveBoundingBox"))
-            ns.Print("   max:    " .. Box(a, "GetMaxBoundingBox"))
-            if a.SetPreferModelCollisionBounds then
-                local was = a.IsPreferringModelCollisionBounds and a:IsPreferringModelCollisionBounds()
-                a:SetPreferModelCollisionBounds(not was)
-                ns.Print("   active, collision bounds " .. tostring(not was) .. ": " .. Box(a, "GetActiveBoundingBox"))
-                a:SetPreferModelCollisionBounds(was and true or false)
-            end
-        end
-        sc:Hide()
-    end)
 end

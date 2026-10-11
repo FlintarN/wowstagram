@@ -238,9 +238,9 @@ local function ApplyDefaults(db, defaults)
     end
 end
 
--- This character's own data (ns.my). An older copy of the addon kept it
--- for the whole account: it goes to the character it belongs to, the one
--- who posted pictures here (or the first to log in, if nobody did).
+-- This character's own data (ns.my). Version 1.0.0 kept it for the whole
+-- account: it goes to the character it belongs to, the one who posted
+-- pictures here (or the first to log in, if nobody did).
 local OLD_CHAR_KEYS = { "me", "following", "activity", "unread", "myComments", "myLikes" }
 function ns.LoadCharacter()
     local db = ns.db
@@ -271,7 +271,7 @@ function ns.LoadCharacter()
     end
     ApplyDefaults(c, CHAR_DEFAULTS)
     -- When this character started keeping a record of its things (to vouch
-    -- for them); a claimed record from an older copy may have gaps.
+    -- for them); a record claimed from 1.0.0 may have gaps.
     c.since = c.since or ns.Now()
     ns.my = c
 end
@@ -292,19 +292,9 @@ end
 ns.On("ADDON_LOADED", function(name)
     if name ~= ADDON then return end
     WowstagramDB = WowstagramDB or {}
-    if not WowstagramDB.v1 then
-        wipe(WowstagramDB)
-        WowstagramDB.v1 = true
-    end
     ns.db = WowstagramDB
-    -- v2: players are "Name-Realm" ids. Data from before can't be matched up.
-    if not WowstagramDB.v2 then
-        for _, k in ipairs(DATA) do WowstagramDB[k] = nil end
-        WowstagramDB.v2 = true
-    end
     ApplyDefaults(WowstagramDB, DEFAULTS)
     ns.LoadCharacter()
-    WowstagramDB.drafts = nil -- (Create no longer keeps a draft)
 
     ns.Net:Init()
     ns.Social:Init()
@@ -315,9 +305,8 @@ end)
 ---------------------------------------------------------------------------
 -- Slash command
 ---------------------------------------------------------------------------
--- Only these two. The development ones (reset, stats, probe, wall, cvars,
--- racetest, placeholders, boxes, debug) only work with ns.DEV = true, set
--- in this file while working on the addon (never in a release).
+-- Only these two. The development ones (reset, stats, debug, wall, cvars)
+-- only work with ns.DEV = true, set here while working on the addon.
 ns.DEV = false
 local HELP = {
     "/wgram - open or close Wowstagram",
@@ -343,10 +332,6 @@ SlashCmdList.WOWSTAGRAM = function(msg)
     elseif cmd == "reset" then
         ns.db.windowPos = nil
         ns.UI:ResetPosition()
-    elseif cmd == "probe" then
-        ns.Picture.Probe()
-    elseif cmd == "boxes" then
-        ns.Picture.Boxes()
     elseif cmd:match("^cvars") then
         -- (development) every game setting whose name has a word in it,
         -- with its value: run it before and after changing an option to
@@ -367,10 +352,6 @@ SlashCmdList.WOWSTAGRAM = function(msg)
         ns.Print(n .. " settings with \"" .. word .. "\" in the name" .. (#list == 0 and " (this client can't list them)." or "."))
     elseif cmd == "wall" then
         ns.Picture.Wall()
-    elseif cmd == "placeholders" then
-        ns.Picture.PlaceholderReview()
-    elseif cmd == "racetest" then
-        ns.Picture.RaceTest()
     elseif cmd == "stats" then
         local t = ns.Net.Traffic()
         local tombs = 0

@@ -3,7 +3,7 @@
 -- each other, all scrolling smoothly with the mouse wheel (UI\Scroller.lua
 -- crops the 3D pictures at the edges). On the right, you, and people to
 -- follow.
-local ADDON, ns = ...
+local _, ns = ...
 
 local W = ns.Widgets
 local C = W.C

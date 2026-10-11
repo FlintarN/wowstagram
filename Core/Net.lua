@@ -109,10 +109,6 @@ function Net.Peers(window)
     return n
 end
 
-function Net.SeenRecently(name, window)
-    return seen[name] ~= nil and Clock0() - seen[name] <= (window or 600)
-end
-
 -- Per-sender limits: Net.Allow(sender, "like", 40) is true for up to 40
 -- likes a minute from one sender (a burst of that size, then the same rate).
 -- Over it, the message is dropped.

@@ -11,7 +11,7 @@
 -- Drag the picture to turn yourself round, wheel to zoom. Then a caption,
 -- and Share. Every visit starts fresh (nothing is kept from last time, or
 -- over a /reload), except Edit and "Try this look", which bring a picture.
-local ADDON, ns = ...
+local _, ns = ...
 
 local W = ns.Widgets
 local C = W.C

@@ -140,8 +140,6 @@ await A.run(`
   check(back.race == 4 and back.sex == 3 and back.class == "DRUID", "who survives")
   check(back.pose == "dance" and back.yaw == -35 and back.zoom == 130, "pose, yaw, zoom survive")
   check(back.frame == "waist" and back.bg == "elwynn" and back.filter == "noir" and back.drawn, "frame, background, filter, weapons survive")
-  local old = L.Decode("1;xdurotar")
-  check(old.bg == "durotar" and old.filter == "normal", "v0.1 filter that is a place becomes the background")
   check(back.slots[1].a == 123456 and back.slots[16].s == 7 and back.slots[16].i == 5, "appearances survive")
   check(back.slots[5].item == 16966, "item ids survive")
   check(L.Encode(back) == s, "round trip is stable")
@@ -222,7 +220,6 @@ await A.run(`
   local back = L.Decode(L.Encode(look))
   check(back.overlay == "snow" and back.filter == "fel" and back.motion == "drunk" and back.bg == "custom" and back.bgTop == "ff0000"
     and back.bgBottom == "0000ff", "overlay, filter AND motion, and your own colours survive the string")
-  check(L.Decode("1;xdrunk").motion == "drunk", "an older picture with Drunk as its filter: now the motion")
   check(L.Decode("1;oexplode;ubad").overlay == "none", "unknown overlays and broken colours are dropped")
   local pic = ns.Picture.New(UIParent, 356, 445)
   pic:SetLook(look, ns.Me())
@@ -1443,19 +1440,6 @@ section('Scale: spam, oversized, caps, redraws');
     CHAT = {}
     SlashCmdList.WOWSTAGRAM("stats")
     check(#CHAT == 3 and CHAT[1]:find("messages in"), "stats: " .. tostring(CHAT[1]))
-    SlashCmdList.WOWSTAGRAM("placeholders")
-    check(ns.Picture.review ~= nil, "placeholder review opens")
-    ns.Picture.review:Hide()
-    ns.Picture.review:Show()
-    local found = false
-    for _, c in ipairs(ns.Picture.review._children or {}) do
-      for _, g in ipairs(c._children or {}) do
-        if g.shownDisplay and g.actor and g.actor._display == g.shownDisplay then found = true end
-      end
-    end
-    check(found, "reopened: still the NPC looks, not you")
-    SlashCmdList.WOWSTAGRAM("racetest")
-    check(ns.Picture.raceTest ~= nil, "race test window opens")
   `);
   players.splice(players.indexOf(S1), 1);
   players.splice(players.indexOf(S2), 1);
@@ -1586,7 +1570,7 @@ await D.run(`
 // Globals: only the ones an addon needs.
 {
   const allowed = new Set(['WowstagramDB', 'SLASH_WOWSTAGRAM1', 'SLASH_WOWSTAGRAM2', 'WowstagramMinimapButton',
-    'WowstagramScreenshot', 'WowstagramWall', 'WowstagramPlaceholders', 'WowstagramRaceTest']);
+    'WowstagramScreenshot', 'WowstagramWall']);
   const found = new Map();
   for (const p of players) {
     await p.run(`__GL = {} for k, src in pairs(__ADDON_GLOBALS) do table.insert(__GL, k .. " (" .. src .. ")") end`);

@@ -2,7 +2,7 @@
 -- #tag. People: only those known to have Wowstagram (S.People); friends,
 -- people you follow and people you've seen lately come first.
 -- With nothing typed: the people you're closest to and the most used tags.
-local ADDON, ns = ...
+local _, ns = ...
 
 local W = ns.Widgets
 local C = W.C

@@ -16,7 +16,7 @@
 --     count = function() return n end,
 --   })
 --   sc:Refresh()   -- the data changed
-local ADDON, ns = ...
+local _, ns = ...
 
 local SC = {}
 ns.Scroller = SC
@@ -142,11 +142,6 @@ function SC.New(parent, opts)
 
     function sc:ScrollBy(dy)
         self:ScrollTo(self.target + dy)
-    end
-
-    -- Bring row `idx` to the top.
-    function sc:ScrollToRow(idx, instant)
-        self:ScrollTo(headerH + (idx - 1) * opts.rowH - 8, instant)
     end
 
     view:EnableMouseWheel(true)

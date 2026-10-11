@@ -3,7 +3,7 @@
 -- 3 following", who they are and their bio, then POSTS and SAVED (yours
 -- only) over a three-column grid. Hover a picture for its likes and
 -- comments. The whole page scrolls, header and all (UI\Scroller.lua).
-local ADDON, ns = ...
+local _, ns = ...
 
 local W = ns.Widgets
 local C = W.C

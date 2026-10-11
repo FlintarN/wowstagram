@@ -5,7 +5,7 @@
 --
 -- Pages: feed, studio, activity, profile, settings, and two that open from
 -- others: post (one picture, with comments) and person (someone's profile).
-local ADDON, ns = ...
+local _, ns = ...
 
 local W = ns.Widgets
 local C = W.C

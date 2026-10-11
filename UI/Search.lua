@@ -18,7 +18,10 @@ local function Why(id)
     if S.Following(id) then return "You follow them" end
     if S.InGuild(id) then return "In your guild" end
     local t = ns.db.met[id]
-    if t then return "Seen " .. ns.Ago(t) .. " ago" end
+    if t then
+        local ago = ns.Ago(t)
+        return ago == "just now" and "Seen just now" or ("Seen " .. ago .. " ago")
+    end
     local n = #S.List(id)
     if n > 0 then return n .. (n == 1 and " picture" or " pictures") end
     return ""

@@ -14,6 +14,7 @@
 --                                       -- each with pic.rowY = its distance from the row's top
 --     fill = function(row, index) ... end,
 --     count = function() return n end,
+--     onScroll = function() ... end,    -- optional: the page is about to move
 --   })
 --   sc:Refresh()   -- the data changed
 local _, ns = ...
@@ -30,7 +31,6 @@ function SC.New(parent, opts)
     local content = CreateFrame("Frame", nil, view)
     content:SetSize(1, 1)
     view:SetScrollChild(content)
-    view:SetScript("OnSizeChanged", function(_, w) content:SetWidth(w) end)
     sc.view, sc.content = view, content
 
     local headerH = opts.headerH or 0
@@ -130,6 +130,7 @@ function SC.New(parent, opts)
     end)
 
     function sc:ScrollTo(y, instant)
+        if opts.onScroll then opts.onScroll() end
         self.target = math.max(0, math.min(MaxOffset(), y))
         if instant then
             self.offset = self.target

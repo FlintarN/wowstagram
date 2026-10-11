@@ -1,10 +1,11 @@
 -- Main window: the game's own portrait window (ButtonFrameTemplate) with the
 -- Wowstagram logo beside the camera portrait, and inside it Instagram's desktop
--- layout: a sidebar on the left (Home, Create, Notifications, Profile,
--- Settings) and the page on the right.
+-- layout: a sidebar on the left (Home, Search, Create, Notifications,
+-- Profile, Settings) and the page on the right.
 --
--- Pages: feed, studio, activity, profile, settings, and two that open from
--- others: post (one picture, with comments) and person (someone's profile).
+-- Pages: feed, search, studio, activity, profile, settings, and two that open
+-- from others: post (one picture, with comments) and person (someone's
+-- profile).
 local _, ns = ...
 
 local W = ns.Widgets
@@ -41,9 +42,9 @@ end
 -- Switch page without opening the window.
 function UI:Select(key, arg)
     if key == "post" or key == "person" then
-        if self.tab ~= key then self.back = self.tab end
+        if self.tab ~= key then self.back, self.backArg = self.tab, self.arg end
     else
-        self.back = nil
+        self.back, self.backArg = nil, nil
     end
     self.tab = key
     self.arg = arg
@@ -56,7 +57,7 @@ function UI:Select(key, arg)
 end
 
 function UI:Back()
-    self:Show(self.back or "feed")
+    self:Show(self.back or "feed", self.backArg)
 end
 
 function UI:OpenPost(id)

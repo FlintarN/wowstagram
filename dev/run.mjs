@@ -455,6 +455,14 @@ await FS.run(`
   local m = S.Mentions("hey @Best Friend look")
   check(#m == 1 and m[1].id == "Best Friend", "a two-word mention")
   check(ns.Feed.Rich("hey @Best Friend look"):find("|Hwgperson:Best Friend|h", 1, true), "mentions become links")
+  do
+    local r = ns.Feed.Rich("@Best Friend and @Best Friend again")
+    local links = 0
+    for _ in r:gmatch("|Hwgperson:") do links = links + 1 end
+    -- Whole, plain links taken out: nothing of a link may be left.
+    local rest = r:gsub("|Hwgperson:[^|]*|h|c%x+[^|]*|r|h", "")
+    check(links == 2 and not rest:find("wgperson", 1, true), "the same mention twice: two links, none inside another")
+  end
   local r = ns.Search.Find("best")
   check(r[1] and r[1].person == "Best Friend", "search finds people by part of the name")
   S.Meet("Never Used It")

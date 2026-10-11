@@ -85,7 +85,7 @@ function SP.New(parent)
         local un = W.Flat(parent, "Unblock", 70, 22, "link", function(self)
             if self.who then ns.Social.Block(self.who, false) end
         end, 11)
-        un:SetPoint("TOPLEFT", x + w - 80, -(-(y - 96) + 22 + (i - 1) * 26) + 4)
+        un:SetPoint("TOPLEFT", x + w - 80, y - 114 - (i - 1) * 26) -- (level with its row)
         view.blockedRows[i] = { text = row, button = un }
     end
     view.blockedMore = W.Text(parent, 11, C.dim)

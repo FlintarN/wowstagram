@@ -153,7 +153,7 @@ function PR.New(parent, key)
                         thumb:SetLook(post.look, post.author)
                     end
                     thumb.likes:SetText(ns.Count(S.Likes(post)))
-                    thumb.comments:SetText(ns.Count(#post.comments))
+                    thumb.comments:SetText(ns.Count(#S.Comments(post)))
                     thumb:Show()
                 else
                     thumb:Hide()

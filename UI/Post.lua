@@ -200,23 +200,6 @@ function PP.New(parent)
     view.send = W.Flat(right, "Post", 50, 30, "link", function() Send(view.commentBox:GetText() or "") end)
     view.send:SetPoint("BOTTOMRIGHT", -8, 7)
 
-    -- The menu's rows (kept by name: tests and other pages use them).
-    view.menu:Set({
-        { "Try this look", function() if view.post then ns.Studio.Remix(view.post, view.whoLook) end end },
-        { "Edit", function() if view.post then ns.Studio.Edit(view.post) end end },
-        { "Delete", function()
-            local post = view.post
-            if not post then return end
-            W.Confirm("Delete this picture for everyone?", function()
-                S.Delete(post.id)
-                UI:Back()
-            end)
-        end, danger = true },
-        { "Go to profile", Person },
-        { "Save to computer", function() if view.post then ns.Picture.SaveToComputer(view.post) end end },
-    })
-    view.remix, view.edit, view.delete = view.menu.rows[1], view.menu.rows[2], view.menu.rows[3]
-
     view.gone = W.Text(parent, 16, C.dim)
     view.gone:SetPoint("CENTER")
     view.gone:SetText("This picture was deleted.")
@@ -226,6 +209,7 @@ function PP.New(parent)
         self.post = nil
         self.scrollEnd = false
         self.menu:Hide()
+        self.list:ScrollToTop()
     end
 
     -- The heart and "Liked by ...", now. bounce: pop the heart (just liked).
@@ -285,9 +269,6 @@ function PP.New(parent)
         self.when:SetText(When(post.t))
 
         -- The menu: everyone can try the look; only you edit or delete.
-        self.remix:SetShown(true)
-        self.edit:SetShown(mine)
-        self.delete:SetShown(mine)
         self.menu:Set({
             { "Try this look", function() ns.Studio.Remix(post, self.whoLook) end },
             { "Edit", function() ns.Studio.Edit(post) end, shown = mine },
@@ -303,6 +284,7 @@ function PP.New(parent)
                 ns.UI:ConfirmBlock(post.author)
             end, danger = true, shown = not mine },
         })
+        self.remix, self.edit, self.delete = self.menu.rows[1], self.menu.rows[2], self.menu.rows[3]
 
         local look = L.Decode(post.look)
         -- Whose look: the poster (0) or someone else in the picture.
@@ -316,7 +298,7 @@ function PP.New(parent)
                 local name = who and ns.Display(who) or "?"
                 name = name:match("^(%S+)") or name
                 b:SetText(name)
-                local tw = b.text and b.text.GetStringWidth and b.text:GetStringWidth() or (#name * 6)
+                local tw = b.label and b.label.GetStringWidth and b.label:GetStringWidth() or (#name * 6)
                 b:SetWidth(math.max(24, tw + 12))
                 b:ClearAllPoints()
                 b:SetPoint("LEFT", self.lookLabel, "LEFT", x - 14, 0)

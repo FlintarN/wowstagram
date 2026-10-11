@@ -1,13 +1,14 @@
 -- Create (the Studio): make a picture. It starts as you, as you look right
--- now (your transmog included). Then the four tabs, like Instagram's editor:
+-- now (your transmog included). Then the tools on the left (ST.TOOLS):
+--   People      up to three more in the picture (your target or group)
 --   Outfit      click a slot to take that piece off (click again to put it
 --               back), right-click to empty it; drop an item from your bags
 --               on a slot or the picture, shift-click any item link, or type
 --               an item id. Take all off / Put all on, and "Wear my current
 --               outfit" to start again from what you're wearing.
---   Pose        22 poses, the framing (full, waist up, face), weapons out
---   Background  where you stand
---   Filter      over the whole picture
+--   Pose        the poses, the framing (full, waist up, face), weapons out
+--   Backdrop, Filter, Motion, Overlay: where you stand and what's over it
+--   Stickers, Text, Frame, Lens: what's laid on top
 -- Drag the picture to turn yourself round, wheel to zoom. Then a caption,
 -- and Share. Every visit starts fresh (nothing is kept from last time, or
 -- over a /reload), except Edit and "Try this look", which bring a picture.
@@ -911,8 +912,10 @@ end
 function ST.Remove(i)
     local look = view.look
     if not (i and i > 0 and look.people[i]) then return end
+    -- (stashes are made when a person is first picked, so there can be
+    -- gaps: shifted down by hand, not with table.remove)
+    for k = i, #look.people do view.stashes[k] = view.stashes[k + 1] end
     table.remove(look.people, i)
-    table.remove(view.stashes, i)
     Arrange()
     ST.Select(0)
     ST.Redraw()
@@ -1174,7 +1177,7 @@ function ST.Paint()
             b:Hide()
         end
     end
-    view.addHint:SetText(full and "The picture is full (4 people)."
+    view.addHint:SetText(full and "The picture is full (" .. L.MAX_PEOPLE .. " people)."
         or (#cands == 0 and "Target a player or group up: only people you can see." or ""))
     view.post:SetText(view.editing and "Save" or "Share")
     -- Guild only: greyed out with no guild, and fixed once shared.

@@ -51,11 +51,20 @@ function F.Rich(text)
     text = text:gsub("#([%w_\128-\255]+)", function(tag)
         return "|Hwgtag:" .. tag:lower() .. "|h" .. LINK .. "#" .. tag .. "|r|h"
     end)
+    -- Each mention once, longest first (so "@Bob" never cuts into "@Bobby"),
+    -- marked first and made links at the end (never inside another link).
+    local list, seen = {}, {}
     for _, m in ipairs(ns.Social.Mentions(text)) do
-        local at = m.at:gsub("%p", "%%%0")
-        text = text:gsub(at, "|Hwgperson:" .. m.id .. "|h" .. LINK .. m.at .. "|r|h", 1)
+        if not seen[m.at] then seen[m.at] = true; list[#list + 1] = m end
     end
-    return text
+    table.sort(list, function(a, b) return #a.at > #b.at end)
+    for i, m in ipairs(list) do
+        text = text:gsub((m.at:gsub("%p", "%%%0")), "\001" .. i .. "\001")
+    end
+    return (text:gsub("\001(%d+)\001", function(i)
+        local m = list[tonumber(i)]
+        return "|Hwgperson:" .. m.id .. "|h" .. LINK .. m.at .. "|r|h"
+    end))
 end
 
 -- A link in a caption or comment was clicked.
@@ -80,10 +89,9 @@ function F.NameLine(name, class, text)
     return ns.ColorName(name, class) .. "  " .. F.Rich(text)
 end
 
--- What a heart click does everywhere: like or unlike, with the sound.
--- show(post, liked): redraw the post's heart and likes right away (the
--- page's own redraw comes a moment later).
--- The thumbs-down: dislike or take it back.
+-- The thumbs-down: dislike or take it back. show(post, liked): redraw the
+-- post's heart and likes right away (the page's own redraw comes a moment
+-- later).
 function F.ToggleDislike(post, show)
     if not post then return end
     S.Dislike(post.id, not S.Disliked(post))
@@ -91,6 +99,7 @@ function F.ToggleDislike(post, show)
     if show then show(post, false) end
 end
 
+-- What a heart click does everywhere: like or unlike, with the sound.
 function F.ToggleLike(post, show)
     if not post then return end
     local on = not S.Liked(post)
@@ -248,6 +257,7 @@ function F.Card(parent, w, ph, onOpen, menuParent)
     end
 
     function card:SetPost(post)
+        if self.post ~= post then self.menu:Hide() end -- (it was about the last one)
         local changed = self.post ~= post or self.lookString ~= post.look
         self.post = post
         self.lookString = post.look
@@ -256,7 +266,7 @@ function F.Card(parent, w, ph, onOpen, menuParent)
         local class = post.class or prof.class
         self.face:SetPlayer(post.author, class)
         self.name.text:SetText(ns.Display(post.author) .. W.Hex(C.dim) .. "  \194\183  " .. ns.Ago(post.t) .. "|r"
-            .. (post.share == "guild" and (W.Hex(C.green or C.dim) .. "   guild only|r") or "")
+            .. (post.share == "guild" and (W.Hex(C.dim) .. "   guild only|r") or "")
             .. (post.bot and (W.Hex(C.faint) .. "   demo|r") or ""))
         self:ShowLikes(post)
         local saved = S.Saved(post.id)
@@ -356,7 +366,7 @@ function F.New(parent)
                 n = n + 1
                 local r = drop.rows[n]
                 r.tag = t.tag
-                r:SetText("#" .. t.tag .. W.Hex(C.dim) .. "  9483  " .. t.n .. (t.n == 1 and " picture" or " pictures") .. "|r")
+                r:SetText("#" .. t.tag .. W.Hex(C.dim) .. "  \194\183  " .. t.n .. (t.n == 1 and " picture" or " pictures") .. "|r")
                 r:Show()
             end
         end
@@ -435,6 +445,7 @@ function F.New(parent)
     view.scroll = ns.Scroller.New(wall, {
         header = storyBar, headerH = STORIES_H, rowH = ROW_H, bottom = 20,
         count = function() return #view.list end,
+        onScroll = function() for _, c in ipairs(view.cards) do c.menu:Hide() end end,
         build = function(row)
             row.card = F.Card(row, COL_W, PIC_H, function(post) UI:OpenPost(post.id) end, parent)
             row.card:SetPoint("TOPLEFT", 6, 0)

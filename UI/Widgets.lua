@@ -211,11 +211,9 @@ function W.Glyph(parent, icon, size, onClick, color)
     b:SetSize(size + 6, size + 6)
     b.icon = W.Icon(b, icon, size, color)
     b.icon:SetPoint("CENTER")
-    b.color = color or C.text
     function b:SetIcon(name, c)
         self.icon:SetTexture(W.ART .. name)
         if c then
-            self.color = c
             self.icon:SetVertexColor(c[1], c[2], c[3], 1)
         end
     end
@@ -336,11 +334,6 @@ function W.Input(parent, w, h, hint, maxLetters, onEnter, onChange)
         if onChange then onChange(s:GetText() or "") end
     end)
     return box
-end
-
--- Old-style input, still used by a few spots.
-function W.EditBox(parent, width, maxLetters, onEnter)
-    return W.Input(parent, width, 26, "", maxLetters, onEnter)
 end
 
 ---------------------------------------------------------------------------
@@ -603,6 +596,8 @@ function W.ScrollList(parent, rowH, buildRow)
         local max = sf.GetVerticalScrollRange and sf:GetVerticalScrollRange() or 0
         sf:SetVerticalScroll(max)
     end
+
+    function list:ScrollToTop() sf:SetVerticalScroll(0) end
 
     parent:HookScript("OnSizeChanged", function() list:Fit() end)
     return list

@@ -1,6 +1,6 @@
 -- Picture: draws a look (Core\Look.lua) with the game's own 3D model, in a
--- ModelScene with one player actor, the same kind the game's Dressing Room
--- uses.
+-- ModelScene with a player actor for each person, the same kind the game's
+-- Dressing Room uses.
 --
 -- Whose body: the game can only draw a player's real body (race, face, hair)
 -- and dress it from a unit it knows: you, your group, your target, focus or
@@ -11,7 +11,7 @@
 -- Face and hair are the stand-in's, made to fit the race. If no one of that
 -- gender is around: a bare NPC look of their race, wearing only the
 -- separate pieces (helm, shoulders, cloak, weapons); WoW won't paint body
--- clothes onto an NPC (see /wgram racetest).
+-- clothes onto an NPC.
 local _, ns = ...
 
 local W = ns.Widgets
@@ -360,7 +360,7 @@ end
 function P.UnitFor(name)
     if not name then return nil end
     if name == ns.Me() then return "player" end
-    for _, u in ipairs({ "target", "focus", "mouseover", "softfriend", "softinteract" }) do
+    for _, u in ipairs(DONOR_UNITS) do
         if Same(u, name) then return u end
     end
     local n = GetNumGroupMembers and GetNumGroupMembers() or 0
@@ -383,7 +383,6 @@ local EQUIP = {
     INVTYPE_WEAPONOFFHAND = 17, INVTYPE_SHIELD = 17, INVTYPE_HOLDABLE = 17, INVTYPE_RANGED = 16,
     INVTYPE_RANGEDRIGHT = 16, INVTYPE_THROWN = 16,
 }
-P.EQUIP = EQUIP
 
 local function GetInfo(item)
     if C_Item and C_Item.GetItemInfo then return C_Item.GetItemInfo(item) end
@@ -471,7 +470,6 @@ local function Through(c, f)
     for i = 1, 3 do out[i] = math.min(1, (c[i] * (1 - g) + lum * g) * t[i]) end
     return out
 end
-P.Through = Through
 
 -- The backdrop: a background's two colours, through a filter.
 function P.Gradient(tex, bg, f)
@@ -790,22 +788,22 @@ function P.New(parent, w, h, opts)
         if scene.SetCameraFieldOfView then scene:SetCameraFieldOfView(DiagFov(fov, pw, ph - ct - cb)) end
         -- Moved in the picture (right-drag in Create): the camera goes the
         -- other way. Screen right is world +y here; up is +z.
-        local viewH = 2 * d * math.tan(FOV / 2)
-        local viewW = ph > 0 and viewH * pw / ph or viewH
-        local panY = -(look.mx or 0) * viewW
-        local panZ = -(look.my or 0) * viewH
+        local camH = 2 * d * math.tan(FOV / 2)
+        local camW = ph > 0 and camH * pw / ph or camH
+        local panY = -(look.mx or 0) * camW
+        local panZ = -(look.my or 0) * camH
         scene:SetCameraPosition((x1 + x2) / 2 - fx * d, ty - fy * d + panY, tz - fz * d + shift + panZ)
         -- Where the camera looks, for drawing on heads (UI\Decor.lua): the
         -- whole picture's view, as if not cut off.
-        self.cam = { y = ty + panY, z = tz + panZ, half = d * math.tan(FOV / 2), z1 = z1, hgt = z2 - z1, viewW = viewW, viewH = viewH }
+        self.cam = { y = ty + panY, z = tz + panZ, half = d * math.tan(FOV / 2), z1 = z1, hgt = z2 - z1, viewW = camW, viewH = camH }
         -- The other people, where they stand relative to you (the camera
         -- already follows you): right is +y, up is +z.
         for i, q in ipairs(look.people or {}) do
             local a = self.extras[i]
             if a and a.SetPosition then
-                local y, z = ((q.mx or 0) - (look.mx or 0)) * viewW, ((q.my or 0) - (look.my or 0)) * viewH
+                local y, z = ((q.mx or 0) - (look.mx or 0)) * camW, ((q.my or 0) - (look.my or 0)) * camH
                 a.basePos = { 0, y, z }
-                a:SetPosition(0, y, z + (a.lensZ or 0))
+                a:SetPosition(0, y, z)
             end
         end
         ns.Decor.Apply(self)
@@ -838,8 +836,10 @@ function P.New(parent, w, h, opts)
     -- until its box stops changing; then it loads again, dressed.
     -- (A placeholder NPC is measured standing still, as it is: a pose like
     -- "laugh" makes the box taller than the body.)
+    local Watcher -- (below)
     function pic:StartMeasure()
         self.measure = { t = 0, tick = 0 }
+        if scene then scene:SetScript("OnUpdate", Watcher) end
         if actor.SetAlpha then actor:SetAlpha(0) end
         if self.display then
             if actor.ClearModel then actor:ClearModel() end
@@ -859,7 +859,7 @@ function P.New(parent, w, h, opts)
         end
         if actor.SetAlpha then actor:SetAlpha(1) end
         self:Ghost()
-        self.sig, self.watch, self.fitted = nil, 0, false
+        self:Watch()
         self:Dress()
     end
 
@@ -877,21 +877,27 @@ function P.New(parent, w, h, opts)
         if m.t > 2.5 then pic:EndMeasure(nil) end -- (no steady box: frame by the dressed model)
     end
 
-    if scene then
-        scene:SetScript("OnUpdate", function(_, elapsed)
-            if not pic.look then return end
-            if pic.measure then return Measure(elapsed) end
-            pic.watch = (pic.watch or 0) + elapsed
-            if pic.watch > 2.5 and not pic.missing and actor.IsLoaded and actor:IsLoaded() == false then
-                pic.missing = true
-                pic:UpdateBadge()
-            end
-            if pic.watch > 3 and pic.fitted then return end
-            pic.tick = (pic.tick or 0) + elapsed
-            if pic.tick < 0.1 then return end
-            pic.tick = 0
-            if pic:Fit() then pic.fitted = true end
-        end)
+    -- Until the model has loaded and the framing holds still: measured,
+    -- checked and fitted every frame, then left alone.
+    function Watcher(_, elapsed)
+        if not pic.look then return scene:SetScript("OnUpdate", nil) end
+        if pic.measure then return Measure(elapsed) end
+        pic.watch = (pic.watch or 0) + elapsed
+        if pic.watch > 2.5 and not pic.missing and actor.IsLoaded and actor:IsLoaded() == false then
+            pic.missing = true
+            pic:UpdateBadge()
+        end
+        if pic.watch > 3 and pic.fitted then return scene:SetScript("OnUpdate", nil) end
+        pic.tick = (pic.tick or 0) + elapsed
+        if pic.tick < 0.1 then return end
+        pic.tick = 0
+        if pic:Fit() then pic.fitted = true end
+    end
+
+    -- Start watching the model again (it or its framing changed).
+    function pic:Watch()
+        self.sig, self.watch, self.fitted = nil, 0, false
+        if scene then scene:SetScript("OnUpdate", Watcher) end
     end
 
     -- A lens: bigger or smaller, tipped over, upside down (lifted by its
@@ -902,11 +908,11 @@ function P.New(parent, w, h, opts)
         local scale = lens.scale or 1
         if a.SetScale then a:SetScale(scale) end
         if a.SetRoll then a:SetRoll(lens.roll or 0) end
-        a.lensZ = 0 -- (WoW turns a model round its middle: upside down stays in place)
         a.lensAnim = lens.anim
         a.lensYaw = math.rad(person.yaw or 0)
         a.lensH = P.RaceHeight(person.race or 1, person.sex)
-        if main and a.SetPosition then a:SetPosition(0, 0, a.lensZ) end
+        -- (WoW turns a model round its middle: upside down stays in place)
+        if main and a.SetPosition then a:SetPosition(0, 0, 0) end
     end
 
     local function PoseActor(a, person, main)
@@ -948,8 +954,7 @@ function P.New(parent, w, h, opts)
             out[#out + 1] = { x = w / 2 + (yE - cam.y) * k + (fix.x or 0) * base, y = h / 2 - (zE - cam.z) * k + (fix.down or 0) * base,
                 size = base * (fix.size or 1), base = base, key = key, tuned = next(fix) ~= nil,
                 turn = math.sin(yaw), back = math.cos(yaw) < 0.3, person = person, name = name,
-                obs = { half = cam.half, camz = cam.z, camy = cam.y, wy = wy, z1 = wz, bodyH = bodyH, w = w, h = h },
-                turn = math.sin(yaw), back = math.cos(yaw) < 0.3, person = person, name = name }
+                obs = { half = cam.half, camz = cam.z, camy = cam.y, wy = wy, z1 = wz, bodyH = bodyH, w = w, h = h } }
         end
         local mainH = (self.display or self.critter) and P.RaceHeight(look.race, look.sex) or cam.hgt
         if not self.critter then Add(look, 0, cam.z1 or 0, mainH, self.author, actor) end
@@ -978,7 +983,7 @@ function P.New(parent, w, h, opts)
             elseif a.lensAnim == "float" and a.SetPosition then
                 local bob = (0.5 + 0.5 * math.sin(t * 1.8)) * 0.25 * (a.lensH or 2)
                 local b = main and { 0, 0, 0 } or (a.basePos or { 0, 0, 0 })
-                a:SetPosition(b[1], b[2], b[3] + (a.lensZ or 0) + bob)
+                a:SetPosition(b[1], b[2], b[3] + bob)
             end
         end
         if actor then Step(actor, true) end
@@ -992,7 +997,6 @@ function P.New(parent, w, h, opts)
             if pic.extras[i] then PoseActor(pic.extras[i], q) end
         end
     end
-    pic.PoseAll = Pose
 
     -- The other people in a group picture: one actor each, made when needed.
     pic.extras = {}
@@ -1080,8 +1084,10 @@ function P.New(parent, w, h, opts)
                     if C_Item and C_Item.RequestLoadItemDataByID then C_Item.RequestLoadItemDataByID(s.item) end
                     -- Still nothing after 5 seconds: the game hasn't got it.
                     if not pic.waitTimer then
-                        pic.waitTimer = true
+                        local token = {}
+                        pic.waitTimer = token
                         ns.After(5, function()
+                            if pic.waitTimer ~= token then return end -- (a new look since)
                             pic.waitTimer = nil
                             if pic.waiting then
                                 pic.missingItems = pic.missingItems or {}
@@ -1163,14 +1169,13 @@ function P.New(parent, w, h, opts)
     if actor and actor.SetScript then
         pcall(actor.SetScript, actor, "OnModelLoaded", function()
             pic:Dress()
-            pic.sig, pic.watch, pic.fitted = nil, 0, false
+            pic:Watch()
         end)
     end
 
     -- look: a table or a Look string; author: whose picture it is.
     function pic:SetLook(look, author)
         if type(look) == "string" then look = L.Decode(look) end
-        self.shownDisplay = nil
         self.look, self.author, self.drawnShown = look, author, look.drawn
         self.empty:SetText("")
         if not actor then
@@ -1197,7 +1202,7 @@ function P.New(parent, w, h, opts)
         self.best, self.bestFor, self.quality = cur, who, cur.quality
         unit, self.display, self.customRace = cur.unit, cur.display, cur.race
         self.state = cur.quality == 3 and "real" or cur.quality == 2 and "standin" or "lookalike"
-        self.missing, self.missingItems, self.waitingFor = nil, nil, nil
+        self.missing, self.missingItems, self.waitingFor, self.waitTimer = nil, nil, nil, nil
         self.note:SetText("")
         local key = self.display and ("d" .. self.display)
             or (unit .. ":" .. (ns.UnitId(unit) or "") .. ":" .. (self.customRace or 0) .. ":" .. (look.drawn and 1 or 0))
@@ -1210,7 +1215,8 @@ function P.New(parent, w, h, opts)
             key = "c" .. critter
             if self.unitKey ~= key or self.unitName ~= author then
                 self.unitKey, self.unitName, self.unit, self.bodyKey = key, author, nil, key
-                self.sig, self.watch, self.fitted, self.measure = nil, 0, false, nil
+                self.measure = nil
+                self:Watch()
                 if actor.SetAlpha then actor:SetAlpha(1) end
                 if actor.ClearModel then actor:ClearModel() end
                 actor:SetModelByCreatureDisplayID(critter)
@@ -1218,7 +1224,7 @@ function P.New(parent, w, h, opts)
         elseif self.unitKey ~= key or self.unitName ~= author then
             self.unitKey, self.unitName, self.unit = key, author, unit
             self.bodyKey = self.display and key or ((ns.UnitId(unit) or unit) .. ":" .. (self.customRace or ""))
-            self.sig, self.watch, self.fitted = nil, 0, false
+            self:Watch()
             if self.display then
                 self.measure = nil
                 if actor.SetAlpha then actor:SetAlpha(1) end
@@ -1244,27 +1250,6 @@ function P.New(parent, w, h, opts)
         self:UpdateBadge()
     end
 
-    -- Show a creature display by its id, framed like any picture (the
-    -- placeholder review). Nothing put on.
-    function pic:ShowDisplay(id, bg)
-        if not actor then return end
-        self.look = L.New()
-        if bg then self.look.bg = bg end
-        self.shownDisplay = id
-        self.author, self.display, self.unit, self.customRace = nil, id, nil, nil
-        self.unitKey, self.unitName, self.bodyKey = "d" .. id, nil, "d" .. id
-        self.measure = nil
-        self.note:SetText("")
-        self.empty:SetText("")
-        if actor.SetAlpha then actor:SetAlpha(1) end
-        if actor.ClearModel then actor:ClearModel() end
-        actor:SetModelByCreatureDisplayID(id)
-        Light()
-        self.sig, self.watch, self.fitted = nil, 0, false
-        self:Fit()
-        self:Show()
-    end
-
     -- Only the pose, angle, framing or filter changed: no need to redress.
     function pic:Restyle()
         if not (actor and self.look) then return end
@@ -1276,12 +1261,11 @@ function P.New(parent, w, h, opts)
         self:SetupPeople()
         Pose()
         Light()
-        self.sig, self.watch, self.fitted = nil, 0, false
+        self:Watch()
         self:Fit()
     end
 
     function pic:Clear(text)
-        self.shownDisplay = nil
         self.state, self.missing, self.waiting = nil, nil, nil
         if self.badge then self.badge:Hide() end
         self.look, self.author, self.unitKey = nil, nil, nil
@@ -1491,7 +1475,6 @@ function P.New(parent, w, h, opts)
     -- A model set while its frame was hidden can come up blank: set it again
     -- whenever the picture comes into view.
     pic:SetScript("OnShow", function(self)
-        if self.shownDisplay then return self:ShowDisplay(self.shownDisplay) end
         if self.look then
             self.unitKey = nil
             self:SetLook(self.look, self.author)
@@ -1551,19 +1534,32 @@ function P.ReadOutfitOf(unit, cb)
     ns.After(0.05, Try)
 end
 
--- Item data arrived: pictures waiting for it dress again.
+-- Item data arrived: pictures waiting for that item dress again (once for
+-- a burst of items; one the game doesn't have is marked missing at once).
+local redress = {}
 ns.On("GET_ITEM_INFO_RECEIVED", function(id, ok)
+    local any = next(redress) ~= nil
     for pic in pairs(all) do
-        if pic.waiting and pic.look then
-            if ok == false and id and pic.waitingFor and pic.waitingFor[id] then
+        if pic.waiting and pic.look and pic.waitingFor and pic.waitingFor[id] then
+            if ok == false then
                 pic.missingItems = pic.missingItems or {}
                 pic.missingItems[id] = true
                 pic.missing = true
+                pic:UpdateBadge()
             end
-            pic.waitingFor = nil
-            pic:Dress()
+            redress[pic] = true
         end
     end
+    if any or not next(redress) then return end
+    ns.After(0.1, function()
+        for pic in pairs(redress) do
+            redress[pic] = nil
+            if pic.waiting and pic.look then
+                pic.waitingFor = nil
+                pic:Dress()
+            end
+        end
+    end)
 end)
 
 -- Your target, focus or group changed: pictures of those people can now
@@ -1623,7 +1619,7 @@ function P.SaveToComputer(post)
     local ph = math.floor(sh * 0.8)
     local pw = math.floor(ph / L.ASPECT)
     if not shot.pic or shot.picH ~= ph then
-        if shot.pic then shot.pic:Hide() end
+        if shot.pic then shot.pic:Hide(); all[shot.pic] = nil end
         shot.pic = P.New(shot, pw, ph)
         shot.pic:SetPoint("CENTER", 0, sh * 0.03)
         shot.picH = ph
@@ -1712,6 +1708,7 @@ function P.Wall()
     f:RegisterForDrag("LeftButton")
     f:SetScript("OnDragStart", f.StartMoving)
     f:SetScript("OnDragStop", f.StopMovingOrSizing)
+    f:SetScript("OnHide", function() P.faceGrid = nil end) -- (pictures elsewhere stop holding still)
     local close = W.Glyph(f, "Close", 14, function() f:Hide() end)
     close:SetPoint("TOPRIGHT", -6, -6)
     local title = W.Text(f, 14)
@@ -1774,7 +1771,6 @@ function P.Wall()
         self:SetStyle(P.faceGrid and "light" or "secondary")
         Show()
     end, 12)
-    local gridB = tuneB
     P.wallTune, P.wallCells = tuneB, cells
     for _, c in ipairs(cells) do
         local b = CreateFrame("Button", nil, f)
@@ -1829,7 +1825,7 @@ function P.Wall()
         Show()
     end, 12)
     nextPose:SetPoint("RIGHT", nextOutfit, "LEFT", -8, 0)
-    gridB:SetPoint("RIGHT", nextPose, "LEFT", -8, 0)
+    tuneB:SetPoint("RIGHT", nextPose, "LEFT", -8, 0)
     Show()
     P.wall = f
 end

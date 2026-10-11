@@ -37,7 +37,6 @@ local function Hue(h, s, v)
     elseif i == 3 then return p, q, v elseif i == 4 then return t, p, v end
     return v, p, q
 end
-Fx.Hue = Hue
 
 -- The background a look uses: its own two colours for "custom".
 function Fx.Background(look)
@@ -91,7 +90,8 @@ end
 -- Sprites: the moving bits of an overlay (or the stars of Starfield).
 ---------------------------------------------------------------------------
 local function NewSprite(sprites, parent, layer)
-    local tex = parent:CreateTexture(nil, layer or "ARTWORK")
+    -- (stars go above the backdrop, which is BACKGROUND too)
+    local tex = parent:CreateTexture(nil, layer or "ARTWORK", nil, layer == "BACKGROUND" and 2 or 0)
     local s = { tex = tex }
     sprites[#sprites + 1] = s
     return s
@@ -292,7 +292,6 @@ function Fx.Setup(pic, scene)
     layer:SetFrameLevel((scene and scene:GetFrameLevel() or pic:GetFrameLevel()) + 2)
     if layer.SetClipsChildren then layer:SetClipsChildren(true) end
     fx.layer = layer
-    layer:SetScript("OnUpdate", nil)
 end
 
 -- Sway: how the camera turns (yaw, pitch, roll) at time t.

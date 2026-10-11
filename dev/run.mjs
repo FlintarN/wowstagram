@@ -34,6 +34,17 @@ async function Player(name, { demo = false, realm = 'Forever', raw = 'name', gam
     await lua.doString('CLOCK = __clock');
   }
   await lua.doString('ns = {}');
+  // Every new global the addon's own files create (Ketho's checker flags
+  // stray ones): listed at the end.
+  await lua.doString(`
+    __ADDON_GLOBALS = {}
+    setmetatable(_G, { __newindex = function(t, k, v)
+      local info = debug.getinfo(2, "S")
+      local src = info and info.source or ""
+      if src:match("^@Core") or src:match("^@UI") then __ADDON_GLOBALS[k] = src end
+      rawset(t, k, v)
+    end })
+  `);
   for (const file of toc) {
     lua.global.set('__SRC', readFileSync(join(addon, file.replace(/\\/g, '/')), 'utf8'));
     lua.global.set('__NAME', file);
@@ -1571,6 +1582,21 @@ await D.run(`
   check(#ns.db.posts == 0 and next(ns.my.following) == nil, "cleared")
   check(ns.db.demo == false and ns.db.network == true, "switches kept")
 `);
+
+// Globals: only the ones an addon needs.
+{
+  const allowed = new Set(['WowstagramDB', 'SLASH_WOWSTAGRAM1', 'SLASH_WOWSTAGRAM2', 'WowstagramMinimapButton',
+    'WowstagramScreenshot', 'WowstagramWall', 'WowstagramPlaceholders', 'WowstagramRaceTest']);
+  const found = new Map();
+  for (const p of players) {
+    await p.run(`__GL = {} for k, src in pairs(__ADDON_GLOBALS) do table.insert(__GL, k .. " (" .. src .. ")") end`);
+    const list = p.lua.global.get('__GL') || [];
+    for (const entry of Object.values(list)) found.set(entry.split(' ')[0], entry);
+  }
+  const stray = [...found.keys()].filter(k => !allowed.has(k));
+  console.log('Addon globals: ' + ([...found.keys()].join(', ') || 'none'));
+  if (stray.length === 0) passes++; else { failures++; console.log('  FAIL stray globals: ' + stray.map(k => found.get(k)).join(', ')); }
+}
 
 console.log(`\n${passes} passed, ${failures} failed`);
 process.exit(failures ? 1 : 0);

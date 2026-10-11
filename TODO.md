@@ -12,7 +12,7 @@
 - [ ] CurseForge: screenshots (Save to computer), upload `dev/media/icon.png` as the project icon, categories, upload (zip, or a git remote for the packager).
 
 ## Next
-- [ ] **HD / SD character models** (Forever: Options > Graphics > Character Models). Face filters are tuned on HD. Find the setting: `/wgram cvars model` with HD on, then with SD on; the line that changes is it (else try `hd`, `classic`). Then Tune faces with SD on for a second table, and pick the table by that setting. (Server down 2026-10-10.)
+- [ ] **HD / SD character models** (Forever: Options > Graphics > Character Models). Face filters are tuned on HD. Find the setting: `/wgram cvars model` with HD on, then with SD on; the line that changes is it (else try `hd`, `classic`). Then Tune faces with SD on for a second table, and pick the table by that setting.
 - [ ] **Retail face table**: Tune faces on Retail (its HD bodies and look-alikes differ from Forever's).
 - [ ] Retail: check `/wgram wall` for Blood Elf, Draenei, Goblin and Worgen (framing and faces; Goblin's big head is a guess).
 - [ ] Full shots of look-alikes: less hat room? (12% was tried and cut helmets; maybe 18%.)

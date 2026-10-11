@@ -8,17 +8,20 @@
 --   post = {
 --     id, author, class, race, t, edited, caption,
 --     look = "<Look string>",
---     likes = { [name] = t },   -- t > 0: liked at t; t < 0: un-liked at -t
+--     likes = { [name] = t },    -- t > 0: liked at t; t < 0: un-liked at -t
+--     dislikes = { [code] = t }, -- the same, by anonymous codes
 --     comments = { { author, class, t, edited, text }, ... },
---     bot = true,               -- a demo person's post: never sent anywhere
+--     share = "guild",           -- shared with the guild only
+--     unv = true, unvFrom = name,-- passed on by someone else, not yet checked
+--     bot = true,                -- a demo person's post: never sent anywhere
 --   }
 --
 -- Only the owner can change things: a post is edited or deleted only by its
 -- author, a comment only by whoever wrote it, and a like is only ever your
 -- own. Over the network that's checked against who sent the message (WoW
--- tells us). Pictures that pass through a sync are new to us, so they can't
--- be checked that way: a modified addon could still invent a post. It's a
--- toy network, like HearthPhone's.
+-- tells us). Pictures passed on by someone else are checked with their
+-- author when they're around (vouching); a sender caught passing on fakes
+-- gets strikes, and too many shut them out.
 local _, ns = ...
 
 local Net = ns.Net
@@ -31,6 +34,9 @@ local US = "\031" -- field separator: can't be typed, so it never shows up in te
 S.MAX_POSTS = 1000     -- other people's pictures (not yours, saved, or followed people's)
 S.MAX_FOLLOWED = 1000  -- pictures by people you follow and friends
 S.MAX_PER_AUTHOR = 30
+S.MAX_RELAYED_LIKES = 50 -- liker names taken from one passed-on picture
+S.MAX_CHECKS = 500       -- things waiting to be checked with their owners
+S.MAX_SOFT = 1000        -- provisional deletions kept
 S.MAX_CAPTION = 200
 S.MAX_COMMENT = 200
 S.MAX_BIO = 140
@@ -47,14 +53,20 @@ S.RATE = { post = 6, relay = 60, comment = 20, like = 40, delete = 30, profile =
 -- Sync: about this many people answer each hello, however many are online.
 S.ANSWERERS = 3
 
-local heard = {} -- post id -> GetTime() it was last sent or received (sync skips what others just sent)
+local postHeard = {} -- post id -> GetTime() it was last sent or received (sync skips what others just sent)
 
 local function Clock() return GetTime and GetTime() or ns.Now() end
 
+-- Text from anyone: no message separators, line breaks or "|" (WoW's
+-- colour, texture and link codes), at most max bytes (never half a letter).
 local function Clean(text, max)
-    text = tostring(text or ""):gsub("[\029\030\031]", " "):gsub("[\r\n]+", " ")
+    text = tostring(text or ""):gsub("[\029\030\031]", " "):gsub("[\r\n]+", " "):gsub("|", "")
     text = strtrim(text)
-    if #text > max then text = text:sub(1, max) end
+    if #text > max then
+        text = text:sub(1, max)
+        while #text > 0 and text:byte(#text) >= 128 and text:byte(#text) < 192 do text = text:sub(1, -2) end
+        if #text > 0 and text:byte(#text) >= 192 then text = text:sub(1, -2) end
+    end
     return text
 end
 
@@ -201,7 +213,6 @@ end
 local function MeetUnit(unit)
     if UnitExists and UnitExists(unit) and UnitIsPlayer and UnitIsPlayer(unit) then S.Meet(ns.UnitId(unit)) end
 end
-S.MeetUnit = MeetUnit
 
 -- How much you care, probably: friends most, then who you follow, your
 -- guild, and people you've seen lately.
@@ -303,7 +314,7 @@ function S.Heard(id)
     if (heardWait[id] or 0) > now - 300 then return end
     heardWait[id] = now
     ns.db.users[id] = now
-    -- Too many: forget those heard from longest ago.
+    -- Too many: forget those postHeard from longest ago.
     local n = 0
     for _ in pairs(ns.db.users) do n = n + 1 end
     if n > S.MAX_USERS + 100 then
@@ -575,7 +586,6 @@ local function Keep(p, now)
     local off = ns.db.unsaved[p.id]
     return off ~= nil and now - off < S.UNSAVE_GRACE
 end
-S.Keep = function(p) return Keep(p, ns.Now()) end
 
 -- Other people's pictures beyond the limits go, oldest first. That's what
 -- keeps years of pictures from piling up: at most S.MAX_POSTS of theirs,
@@ -627,7 +637,6 @@ local function Prune()
     for id in pairs(db.seen or {}) do
         if not have[id] then db.seen[id] = nil end
     end
-    local now = ns.Now()
     for name, s in pairs(db.strikes or {}) do
         if not s.out and now - (s.t or 0) > 7 * 86400 then db.strikes[name] = nil end
     end
@@ -644,7 +653,7 @@ local function Prune()
     end
 end
 
--- Profiles of people you haven't heard from in the longest time go first.
+-- Profiles of people you haven't postHeard from in the longest time go first.
 local function PruneProfiles()
     local list = {}
     for name, p in pairs(ns.db.profiles) do list[#list + 1] = { name, p.seen or 0 } end
@@ -780,21 +789,34 @@ local function CommentsString(post)
 end
 
 local function Remember(id)
-    heard[id] = Clock()
-    heard.n = (heard.n or 0) + 1
-    if heard.n > 2000 then
+    postHeard[id] = Clock()
+    postHeard.n = (postHeard.n or 0) + 1
+    if postHeard.n > 2000 then
         local cut = Clock() - 600
-        for k, t in pairs(heard) do
-            if k ~= "n" and t < cut then heard[k] = nil end
+        for k, t in pairs(postHeard) do
+            if k ~= "n" and t < cut then postHeard[k] = nil end
         end
-        heard.n = 0
+        postHeard.n = 0
     end
 end
 
 local function PostData(post, withComments)
-    return table.concat({ post.id, post.author, post.class or "", post.race or "", post.t, post.edited or 0,
-        post.look or "", post.caption or "", LikesString(post), withComments and CommentsString(post) or "",
-        post.share == "guild" and "g" or "", LikesString(post, "dislikes") }, US)
+    local function Build(comments, likes, dislikes)
+        return table.concat({ post.id, post.author, post.class or "", post.race or "", post.t, post.edited or 0,
+            post.look or "", post.caption or "", likes, comments, post.share == "guild" and "g" or "", dislikes }, US)
+    end
+    local comments = withComments and CommentsString(post) or ""
+    local likes, dislikes = LikesString(post), LikesString(post, "dislikes")
+    local data = Build(comments, likes, dislikes)
+    -- Too big for one message (Net.MAX_BYTES): fewer comments, then the
+    -- likes and dislikes are left to their own messages.
+    local limit = Net.MAX_BYTES - 100
+    while #data > limit and comments ~= "" do
+        comments = comments:match("^[^\029]*\029(.*)$") or ""
+        data = Build(comments, likes, dislikes)
+    end
+    if #data > limit then data = Build("", "", "") end
+    return data
 end
 
 local function SendPost(post, scope, withComments)
@@ -838,19 +860,29 @@ Net.On("P", function(sender, data, chatType)
     Remember(id)
     if relay then relayHeard[chatType == "GUILD" and "guild" or "realm"] = Clock() end
     local likes = {}
+    local taken = 0
     for name, lt in (f[9] or ""):gmatch("([^,=]+)=(%-?%d+)") do
-        -- (a like "by you" only stands if it's yours)
-        if ns.ValidName(name) and (name ~= ns.Me() or S.MyLikeIs(id, tonumber(lt))) then likes[name] = tonumber(lt) end
+        -- (a like "by you" only stands if it's yours; at most so many names
+        -- passed on per message, each checked with its liker)
+        if ns.ValidName(name) and (name ~= ns.Me() or S.MyLikeIs(id, tonumber(lt))) then
+            likes[name] = tonumber(lt)
+            if name ~= sender then taken = taken + 1 end
+            if taken >= S.MAX_RELAYED_LIKES then break end
+        end
     end
     local oldLikes = {}
     local before = S.Find(id)
     for name in pairs(likes) do oldLikes[name] = before and before.likes and before.likes[name] end
+    -- Dislikes can't be checked (they're anonymous): only the picture's own
+    -- author passes them on (they got each one from the disliker).
     local dislikes = {}
-    for code, lt in (f[12] or ""):gmatch("([^,=]+)=(%-?%d+)") do
-        if code:match("^d%w+$") and #code <= 40 then dislikes[code] = tonumber(lt) end
+    if author == sender then
+        for code, lt in (f[12] or ""):gmatch("([^,=]+)=(%-?%d+)") do
+            if code:match("^d%w+$") and #code <= 40 then dislikes[code] = tonumber(lt) end
+        end
     end
     local post = S.Store({
-        id = id, author = author, class = ns.ValidClass(f[3]), race = tonumber(f[4]), t = t,
+        id = id, author = author, class = ns.ValidClass(f[3]), race = ns.Look.Race(f[4]), t = t,
         edited = tonumber(f[6]) or 0, look = f[7] or "", caption = Clean(f[8], S.MAX_CAPTION), likes = likes,
         dislikes = dislikes, share = share,
     }, sender)
@@ -860,7 +892,7 @@ Net.On("P", function(sender, data, chatType)
         local soft = S.ResolveSoft("p:" .. id, author, sender)
         if soft and not stored.unv then
             -- (passed on, with a deletion pending: checked with the author)
-            stored.unv, stored.unvFrom, stored.softDel = true, sender, soft.from
+            stored.unv, stored.unvFrom = true, sender
             S.Check(author, "p", stored, nil, sender)
         end
         -- From its author: confirmed. Passed on by someone else: checked
@@ -881,7 +913,7 @@ Net.On("P", function(sender, data, chatType)
             end
         end
     end
-    if post and author == sender and (post.edited or 0) == 0 and S.MentionsMe(post.caption) then
+    if post and not existed and author == sender and (post.edited or 0) == 0 and S.MentionsMe(post.caption) then
         Activity("mention", author, post, post.caption)
     end
     -- Comments that came along (a sync).
@@ -1000,7 +1032,7 @@ Net.On("R", function(sender, data)
     local old = ns.db.profiles[sender]
     if old and (old.t or 0) > t then return end
     ns.db.profiles[sender] = {
-        class = ns.ValidClass(f[1]), race = tonumber(f[2]), level = math.max(0, math.min(200, tonumber(f[3]) or 0)),
+        class = ns.ValidClass(f[1]), race = ns.Look.Race(f[2]), level = math.max(0, math.min(200, tonumber(f[3]) or 0)),
         guild = Clean((f[4] or ""):gsub("|", ""), 48), bio = Clean(f[5], S.MAX_BIO), t = t, seen = ns.Now(),
     }
     PruneProfiles()
@@ -1028,17 +1060,15 @@ local function Offline(_, _, msg)
             local short = ns.Display(name)
             if msg == ERR_CHAT_PLAYER_NOT_FOUND_S:format(name) or msg == ERR_CHAT_PLAYER_NOT_FOUND_S:format(short)
                 or msg == ERR_CHAT_PLAYER_NOT_FOUND_S:format(Net.Full(name)) then
-                if S.Unreachable then S.Unreachable(name) end
+                S.Unreachable(name)
                 return true
             end
         end
     end
     return false
 end
+S.OfflineFilter = Offline -- (the chat filter, for the tests)
 if ChatFrame_AddMessageEventFilter then ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", Offline) end
-S.OfflineFilter = Offline
-
-S.Asked = asked
 
 Net.On("Q", function(sender)
     if not Net.Allow(sender, "ask", S.RATE.ask) then return end
@@ -1079,7 +1109,7 @@ local function SendAnswer(since, scope, asked)
     local from = (since or 0) - S.SYNC_WINDOW
     for _, p in ipairs(ns.db.posts) do
         if sent >= S.SYNC_POSTS then break end
-        if not p.bot and not p.unv and p.t > from and (heard[p.id] or -1) < asked and (p.share ~= "guild" or scope == "guild") then
+        if not p.bot and not p.unv and p.t > from and (postHeard[p.id] or -1) < asked and (p.share ~= "guild" or scope == "guild") then
             SendPost(p, scope, true)
             sent = sent + 1
         end
@@ -1119,7 +1149,7 @@ function S.Answer(since, scope)
 end
 
 Net.On("H", function(sender, data, chatType)
-    if S.Reachable then S.Reachable(sender) end
+    S.Reachable(sender)
     if not Net.Allow(sender, "hello", S.RATE.hello) then return end
     S.Answer(tonumber(data) or 0, chatType == "GUILD" and "guild" or "realm")
 end)
@@ -1250,7 +1280,6 @@ function S.Delete(id)
     ns.Changed()
 end
 
--- name: who likes it (a demo person), default you.
 -- A like or dislike (field) on or off, by name; sent unless it's a demo.
 local function Vote(post, field, cmd, on, name)
     local key = field == "dislikes" and S.Anon(name) or name
@@ -1261,7 +1290,7 @@ local function Vote(post, field, cmd, on, name)
     if t <= old then t = old + 1 end
     post[field][key] = on and t or -t
     if name == ns.Me() and not post.bot then
-        heard[post.id] = nil
+        postHeard[post.id] = nil
         if field == "likes" then S.RememberMine("l", post.id, post.likes[key]) end
         Send(cmd, table.concat({ post.id, key, post[field][key] }, US), ScopeOf(post))
     end
@@ -1277,24 +1306,15 @@ function S.Dislike(id, on, name)
     ns.Changed()
 end
 
+-- name: who likes it (a demo person), default you.
 function S.Like(id, on, name)
     local post = S.Find(id)
     if not post then return end
     name = name or ns.Me()
     if S.Liked(post, name) == (on and true or false) then return end
     if on and S.Disliked(post, name) then Vote(post, "dislikes", "N", false, name) end
-    local t = ns.Now()
-    -- Two clicks in the same second must still count as newer.
-    local old = math.abs(post.likes[name] or 0)
-    if t <= old then t = old + 1 end
-    post.likes[name] = on and t or -t
-    if name == ns.Me() and not post.bot then
-        heard[id] = nil
-        S.RememberMine("l", id, post.likes[name])
-        Send("L", table.concat({ id, name, post.likes[name] }, US), ScopeOf(post))
-    elseif name ~= ns.Me() and on then
-        Activity("like", name, post)
-    end
+    Vote(post, "likes", "L", on, name)
+    if name ~= ns.Me() and on then Activity("like", name, post) end
     ns.Changed()
 end
 
@@ -1356,14 +1376,8 @@ end
 -- like as it really is, ? can't say (from before they kept a record).
 -- Offline: asked again later, or when they say hello.
 ---------------------------------------------------------------------------
-local Hash36 = function(s)
-    local h1, h2 = 5381, 52711
-    for i = 1, #s do
-        local b = s:byte(i)
-        h1 = (h1 * 33 + b) % 4294967296
-        h2 = (h2 * 31 + b) % 4294967296
-    end
-    return ns.Look.B36(h1) .. ns.Look.B36(h2)
+local function Hash36(s)
+    return ns.Look.B36(Hash(s)) .. ns.Look.B36(Hash("#" .. s))
 end
 
 function S.PostPrint(post)
@@ -1439,11 +1453,17 @@ end
 -- What's waiting to be checked, per person: key -> item.
 local queue, nextTry, inFlight = {}, {}, {}
 S.VOUCH_BATCH = 40
+S.MAX_FOLLOW = 5 -- full pictures or comments sent back per check
 
 function S.Check(name, kind, post, t, from)
     if not name or name == ns.Me() or post.bot or (ns.Bots and ns.Bots.Is(name)) then return end
     if kind == "p" then t = post.t end -- (its date: was it posted after they kept a record?)
     local key = kind .. ":" .. post.id .. ":" .. tostring(t or "")
+    if not queue[name] then
+        local n = 0
+        for _ in pairs(queue) do n = n + 1 end
+        if n >= S.MAX_CHECKS then return end
+    end
     queue[name] = queue[name] or {}
     queue[name][key] = { kind = kind, id = post.id, t = t, print = kind == "p" and S.PostPrint(post) or nil, from = from }
     if kind == "c" then
@@ -1521,7 +1541,8 @@ Net.On("V", function(sender, data, chatType)
             local post = S.Find(id)
             if ns.db.tombs["p:" .. id] then a = "D"
             elseif post and post.author == ns.Me() then
-                if S.PostPrint(post) == print then a = "1" else a = "2"; follow[#follow + 1] = { "P", PostData(post, false) } end
+                if S.PostPrint(post) == print then a = "1"
+                elseif #follow < S.MAX_FOLLOW then a = "2"; follow[#follow + 1] = { "P", PostData(post, false) } end
             elseif S.Vouchable(t or (post and post.t)) then a = "0" end
         elseif kind == "c" and t then
             local key = id .. ":" .. t
@@ -1534,7 +1555,7 @@ Net.On("V", function(sender, data, chatType)
                     for _, x in ipairs(post and post.comments or {}) do
                         if x.author == ns.Me() and x.t == t then c = x end
                     end
-                    if c then
+                    if c and #follow < S.MAX_FOLLOW then
                         a = "2"
                         follow[#follow + 1] = { "C", table.concat({ id, c.author, c.class or "", c.t, c.edited or 0, c.text }, US) }
                     end
@@ -1548,11 +1569,7 @@ Net.On("V", function(sender, data, chatType)
         answers[#answers + 1] = a
     end
     Net.Whisper("W", table.concat(answers, ","), sender)
-    -- (at most a few full pictures or comments sent back per request)
-    for i, m in ipairs(follow) do
-        if i > 5 then break end
-        Net.Whisper(m[1], m[2], sender)
-    end
+    for _, m in ipairs(follow) do Net.Whisper(m[1], m[2], sender) end
 end)
 
 -- The answers: keep, drop (for good), or wait for the real one.
@@ -1701,7 +1718,14 @@ end
 ---------------------------------------------------------------------------
 function S.SoftTomb(key, t, from)
     local soft = ns.db.softTombs
-    if not soft[key] then soft[key] = { t = t, from = from } end
+    if soft[key] then return end
+    S.softCount = (S.softCount or 0) + 1
+    if S.softCount % 50 == 0 then
+        local n = 0
+        for _ in pairs(soft) do n = n + 1 end
+        if n >= S.MAX_SOFT then return end
+    end
+    soft[key] = { t = t, from = from }
 end
 
 -- Something arrived that had a provisional deletion: from its owner (alive:

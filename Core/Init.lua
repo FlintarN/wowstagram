@@ -194,13 +194,11 @@ local DEFAULTS = {
     profiles = {},    -- id -> { class, race, level, guild, bio, t }
     saved = {},       -- post id -> time you bookmarked it
     unsaved = {},     -- post id -> time you took the bookmark off (kept a while, in case it was a slip)
-    faceTune = {},    -- (development) face filter corrections tuned on /wgram wall
     blocked = {},     -- id -> when you blocked them: their pictures and comments are hidden
     met = {},         -- id -> when you last saw them (nameplates, target, group, chat nearby)
     strikes = {},     -- id -> { n = points, t = when }: caught faking (Social)
     users = {},       -- id -> when their addon last sent you anything (they have Wowstagram)
     softTombs = {},   -- "p:id" / "c:id:author:t" -> { t, from }: a deletion passed on by someone else (Social)
-    faceObs = {},     -- (development) what the camera saw for each tuned face
     seen = {},        -- post id -> true once you've looked at it (story rings)
     minimap = true,
     minimapAngle = 220,
@@ -281,6 +279,8 @@ end
 local DATA = { "posts", "tombs", "profiles", "saved", "unsaved", "blocked", "met", "strikes", "users", "softTombs", "seen", "chars" }
 function ns.ResetAll()
     for _, k in ipairs(DATA) do ns.db[k] = nil end
+    for _, k in ipairs(OLD_CHAR_KEYS) do ns.db[k] = nil end
+    ns.db.charsClaimed = true
     ApplyDefaults(ns.db, DEFAULTS)
     ns.LoadCharacter()
     -- (Anything of yours from before now can't be vouched for: Social.)

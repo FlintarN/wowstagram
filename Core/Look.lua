@@ -130,10 +130,10 @@ end
 -- Liquids: WoW's own animated water textures (30 frames each, by file id:
 -- their names don't load), tiled.
 for _, b in ipairs({
-    { key = "lava", name = "Lava", frames = { 219795, 219806, 219817, 219819, 219820, 219821, 219822, 219823, 219824, 219796, 219797, 219798, 219799, 219800, 219801, 219802, 219803, 219804, 219805, 219807, 219808, 219809, 219810, 219811, 219812, 219813, 219814, 219815, 219816, 219818 }, light = { 1, 0.7, 0.5 } },
-    { key = "ocean", name = "Ocean waves", frames = { 219855, 219866, 219877, 219879, 219880, 219881, 219882, 219883, 219884, 219856, 219857, 219858, 219859, 219860, 219861, 219862, 219863, 219864, 219865, 219867, 219868, 219869, 219870, 219871, 219872, 219873, 219874, 219875, 219876, 219878 }, light = { 0.8, 0.95, 1 } },
-    { key = "slime", name = "Slime", frames = { 219991, 220002, 220013, 220015, 220016, 220017, 220018, 220019, 220020, 219992, 219993, 219994, 219995, 219996, 219997, 219998, 219999, 220000, 220001, 220003, 220004, 220005, 220006, 220007, 220008, 220009, 220010, 220011, 220012, 220014 }, light = { 0.85, 1, 0.75 } },
-    { key = "lake", name = "Lake", frames = { 219901, 219912, 219923, 219925, 219926, 219927, 219928, 219929, 219930, 219902, 219903, 219904, 219905, 219906, 219907, 219908, 219909, 219910, 219911, 219913, 219914, 219915, 219916, 219917, 219918, 219919, 219920, 219921, 219922, 219924 }, light = { 0.85, 0.95, 1 } },
+    { key = "lq_lava", name = "Lava", frames = { 219795, 219806, 219817, 219819, 219820, 219821, 219822, 219823, 219824, 219796, 219797, 219798, 219799, 219800, 219801, 219802, 219803, 219804, 219805, 219807, 219808, 219809, 219810, 219811, 219812, 219813, 219814, 219815, 219816, 219818 }, light = { 1, 0.7, 0.5 } },
+    { key = "lq_ocean", name = "Ocean waves", frames = { 219855, 219866, 219877, 219879, 219880, 219881, 219882, 219883, 219884, 219856, 219857, 219858, 219859, 219860, 219861, 219862, 219863, 219864, 219865, 219867, 219868, 219869, 219870, 219871, 219872, 219873, 219874, 219875, 219876, 219878 }, light = { 0.8, 0.95, 1 } },
+    { key = "lq_slime", name = "Slime", frames = { 219991, 220002, 220013, 220015, 220016, 220017, 220018, 220019, 220020, 219992, 219993, 219994, 219995, 219996, 219997, 219998, 219999, 220000, 220001, 220003, 220004, 220005, 220006, 220007, 220008, 220009, 220010, 220011, 220012, 220014 }, light = { 0.85, 1, 0.75 } },
+    { key = "lq_lake", name = "Lake", frames = { 219901, 219912, 219923, 219925, 219926, 219927, 219928, 219929, 219930, 219902, 219903, 219904, 219905, 219906, 219907, 219908, 219909, 219910, 219911, 219913, 219914, 219915, 219916, 219917, 219918, 219919, 219920, 219921, 219922, 219924 }, light = { 0.85, 0.95, 1 } },
 }) do
     b.group, b.anim, b.liquid = "fun", "liquid", true
     b.top, b.bottom = { 0.3, 0.3, 0.35 }, { 0.1, 0.1, 0.12 }
@@ -613,7 +613,8 @@ function L.B36(n)
 end
 
 local function N36(s)
-    return s and s ~= "" and tonumber(s, 36) or 0
+    if not s or s == "" or #s > 6 then return 0 end
+    return tonumber(s, 36) or 0
 end
 
 ---------------------------------------------------------------------------
@@ -736,11 +737,18 @@ end
 
 local function Clamp(v, lo, hi) return math.max(lo, math.min(hi, v)) end
 
+-- A race id from anyone: a whole number in range, or nil.
+function L.Race(v)
+    v = tonumber(v)
+    if not v or v ~= math.floor(v) or v < 1 or v > 200 then return nil end
+    return v
+end
+
 -- Anything odd in a string from someone else is dropped, not trusted.
 -- One of a person's fields. True when it was one.
 local function PersonField(p, k, v)
-    if k == "r" then p.race = tonumber(v)
-    elseif k == "g" then p.sex = tonumber(v)
+    if k == "r" then p.race = L.Race(v)
+    elseif k == "g" then if v == "2" or v == "3" then p.sex = tonumber(v) end
     elseif k == "c" then if v:match("^%u+$") then p.class = v end
     elseif k == "p" then if L.POSE[v] then p.pose = v end
     elseif k == "l" then if L.LENS[v] then p.lens = v end
@@ -756,6 +764,7 @@ local function PersonField(p, k, v)
         end
     elseif k == "s" then
         for slot, val in v:gmatch("(%d+)=([%w%.]+)") do
+            if #val > 22 then val = "" end
             slot = tonumber(slot)
             if L.SLOT[slot] then
                 if val:sub(1, 1) == "i" then

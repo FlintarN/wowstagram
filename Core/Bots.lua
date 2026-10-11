@@ -4,9 +4,8 @@
 -- carry `bot = true`, and Settings can switch them off (which removes them).
 --
 -- Their outfits are plain item ids: classic raid tier sets on Retail; on WoW
--- Forever, whose item data doesn't have those (yet), the classic dungeon
--- sets for the same classes (ids checked in ItemTree's Forever data),
--- so they draw on any client. Their pictures show on YOUR character, as any
+-- Forever, whose item data doesn't have those, the classic dungeon sets for
+-- the same classes, so they draw on any client. Their pictures show on YOUR character, as any
 -- picture does when its owner isn't nearby (see UI\Picture.lua).
 local _, ns = ...
 

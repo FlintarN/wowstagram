@@ -39,21 +39,23 @@ local RegisterPrefix = (C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix) or
 
 local handlers = {}
 local address = {} -- id -> the sender string WoW gave us (a whisper goes to exactly that)
-local function Squash(s) return ((s or ""):lower():gsub("[%s%-']", "")) end
+-- A name without spaces, dashes or apostrophes (case kept: WoW's names
+-- have one spelling).
+local function Squash(s) return ((s or ""):gsub("[%s%-']", "")) end
 
 function Net.Full(name)
     if not name then return name end
     return address[name] or name
 end
 
--- The id a message is from: the one the sender put in it, when it really is
--- the player WoW says sent it (the same letters; WoW may leave the realm off
--- for your own realm). Otherwise built from WoW's sender: on Retail the
--- realm is after the last dash; on Forever the sender is the name.
+-- The id a message is from: the one the sender put in it, only when it's
+-- exactly the player WoW says sent it (the same letters, the same case;
+-- WoW leaves your own realm off). Otherwise built from WoW's sender: on
+-- Retail the realm is after the last dash; on Forever the sender is the name.
 local function From(raw, said)
-    if said and said ~= "" then
+    if said and said ~= "" and ns.ValidName(said) then
         local a, b = Squash(raw), Squash(said)
-        if a:sub(1, #b) == b or b:sub(1, #a) == a then return said end
+        if a == b or (not raw:find("-", 1, true) and Squash(raw .. ns.Realm()) == b) then return said end
     end
     if ns.FOREVER then return ns.Id(raw) end
     local name, realm = raw:match("^(.+)%-([^%-]+)$")
@@ -70,6 +72,7 @@ local nextId = 0
 -- bigger is dropped (a broken or hostile addon). Parts that never complete
 -- are forgotten after a while.
 Net.MAX_PARTS, Net.MAX_BYTES, Net.PART_TIMEOUT = 24, 5000, 30
+Net.MAX_OPEN = 8 -- unfinished long messages per sender at a time
 
 local function Clock0() return GetTime and GetTime() or (time and time() or 0) end
 
@@ -100,11 +103,11 @@ function Net.Traffic()
 end
 
 -- Who's been heard from lately: how many people are using it right now.
-local seen = {}
+local peers = {} -- id -> when we last heard from them
 function Net.Peers(window)
     local now, n = Clock0(), 0
-    for name, t in pairs(seen) do
-        if now - t <= (window or 600) then n = n + 1 else seen[name] = nil end
+    for name, t in pairs(peers) do
+        if now - t <= (window or 600) then n = n + 1 else peers[name] = nil end
     end
     return n
 end
@@ -112,14 +115,30 @@ end
 -- Per-sender limits: Net.Allow(sender, "like", 40) is true for up to 40
 -- likes a minute from one sender (a burst of that size, then the same rate).
 -- Over it, the message is dropped.
-local buckets2 = {}
+local senderBuckets = {}
+-- Per-sender records nobody has used for ten minutes go (every few minutes).
+function Net.Sweep(now)
+    now = now or Clock0()
+    if now - (Net.lastBigSweep or 0) < 300 then return end
+    Net.lastBigSweep = now
+    for k, b in pairs(senderBuckets) do
+        if now - b.t > 600 then senderBuckets[k] = nil end
+    end
+    for name, t in pairs(peers) do
+        if now - t > 600 then
+            peers[name] = nil
+            address[name] = nil
+        end
+    end
+end
+
 function Net.Allow(sender, kind, perMinute)
     local key = kind .. "|" .. (sender or "?")
     local now = Clock0()
-    local b = buckets2[key]
+    local b = senderBuckets[key]
     if not b then
         b = { tokens = perMinute, t = now }
-        buckets2[key] = b
+        senderBuckets[key] = b
     end
     b.tokens = math.min(perMinute, b.tokens + (now - b.t) * perMinute / 60)
     b.t = now
@@ -242,6 +261,10 @@ end
 -- Sending and receiving
 ---------------------------------------------------------------------------
 local function SendParts(cmd, data, chatType, target)
+    if #data > Net.MAX_BYTES then
+        Net.dropped = Net.dropped + 1
+        return false
+    end
     data = data or ""
     nextId = (nextId % 999) + 1
     local me = (ns.Me() or "") .. "#" .. Net.PROTO
@@ -314,7 +337,7 @@ function Net.Receive(raw, message, chatType)
     if sender == ns.Me() then return end
     Count("in", #message)
     address[sender] = raw
-    seen[sender] = Clock0()
+    peers[sender] = Clock0()
     i, n = tonumber(i), tonumber(n)
     if n > Net.MAX_PARTS or i < 1 or i > n then
         Net.dropped = Net.dropped + 1
@@ -329,10 +352,17 @@ function Net.Receive(raw, message, chatType)
                 if now - p.t > Net.PART_TIMEOUT then partial[k] = nil end
             end
         end
+        Net.Sweep(now)
         local key = raw .. ":" .. id
         local p = partial[key]
         if not p or p.n ~= n then
-            p = { n = n, got = 0, parts = {}, t = now }
+            local open = 0
+            for _, q in pairs(partial) do if q.raw == raw then open = open + 1 end end
+            if open >= Net.MAX_OPEN then
+                Net.dropped = Net.dropped + 1
+                return
+            end
+            p = { n = n, got = 0, parts = {}, t = now, raw = raw }
             partial[key] = p
         end
         if not p.parts[i] then

@@ -202,7 +202,7 @@ await A.run(`
   look.bg = "gr_cobble"
   pic:Restyle()
   check(pic.art[1]._tex == 187099 and pic.art[1]:IsShown(), "ground: a tiled texture (by file id)")
-  look.bg = "lava"
+  look.bg = "lq_lava"
   pic:Restyle()
   local first = pic.art[1]._tex
   Pump(pic.fx.layer, 0.5)
@@ -1395,6 +1395,30 @@ section('Scale: spam, oversized, caps, redraws');
     local p = ns.Social.Find("zz1")
     check(p and p.caption == "hello from the future" and #ns.db.posts == before + 1, "extra fields at the end are ignored")
     check(true, "half-finished messages are swept after a while")
+    -- Who a message is from: the name in it only when it's exactly the sender.
+    local from
+    ns.Net.On("Z", function(sender) from = sender end)
+    local function SaidBy(raw, said)
+      from = nil
+      ns.Net.Receive(raw, "Z:" .. math.random(9999) .. ":1/1@" .. said .. "#" .. ns.Net.PROTO .. ":x", "CHANNEL")
+      return from
+    end
+    check(SaidBy("Best Friend", "Best Friend") == "Best Friend", "the sender's own name is taken")
+    check(SaidBy("Best Friends", "Best Friend") ~= "Best Friend", "a longer name can't pose as a shorter one")
+    check(SaidBy("Best", "Best Friend") ~= "Best Friend", "nor a shorter one as a longer one")
+    check(SaidBy("BEST FRIEND", "Best Friend") ~= "Best Friend", "nor another spelling")
+    check(SaidBy("Best Friend", "Best|Friend") ~= "Best|Friend", "a broken name is never taken")
+    -- Unfinished long messages: only a few per sender at a time.
+    local d0 = ns.Net.dropped
+    for k = 1, ns.Net.MAX_OPEN + 3 do
+      ns.Net.Receive("Slow Sender", "P:" .. (500 + k) .. ":1/2@Slow Sender#" .. ns.Net.PROTO .. ":x", "CHANNEL")
+    end
+    check(ns.Net.dropped == d0 + 3, "more unfinished messages than allowed are refused")
+    -- Text from others: no "|" codes.
+    ns.Net.Receive("Kind Stranger", "P:8:1/1@Kind Stranger#" .. ns.Net.PROTO .. ":" .. table.concat({ "zz2", "Kind Stranger", "MAGE", "1",
+      tostring(ns.Now()), "0", "1", "|cffff0000red|r |Hitem:1|hlink|h", "", "" }, string.char(31)), "CHANNEL")
+    local p2 = ns.Social.Find("zz2")
+    check(p2 and not p2.caption:find("|", 1, true), "colour and link codes are taken out of captions")
     -- Saved pictures survive the limits; unsaved ones get a week's grace.
     local S = ns.Social
     local keepSaved, keepSlip, goOld = { id = "keep1", author = "Old Friend", t = ns.Now() - 12 * 86400, likes = {}, comments = {} },

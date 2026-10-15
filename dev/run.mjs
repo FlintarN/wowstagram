@@ -1617,6 +1617,59 @@ await B.run(`
   check(((ns.db.strikes["Evil Eve"] or {}).n or 0) > st0, "and whoever made up its deletion gets strikes")
 `);
 
+section('API for other addons');
+await A.run(`
+  local api = WowstagramAPI
+  check(api and api.VERSION == 1, "WowstagramAPI is there, version 1")
+  check(api.Me() == ns.Me() and api.NetworkOn(), "who you are; sharing on")
+  local changed = 0
+  api.OnChange(function() changed = changed + 1 end)
+  api.OnChange(function() error("a broken page elsewhere") end)
+  API_CHANGED = function() return changed end
+  local look = ns.Look.New()
+  look.pose, look.bg = "wave", "lava"
+  API_POST = api.Post(api.Encode(look), "from the phone")
+  local p = api.Find(API_POST)
+  check(p and p.caption == "from the phone" and api.IsMine(p), "a picture posted through it")
+  check(api.Decode(p.look).pose == "wave" and api.Decode(p.look).bg == "lava", "its look as given")
+  check(api.Post("", "nothing") == nil, "no look, no picture")
+  local o = api.Options()
+  check(#o.poses > 5 and #o.framings == 3 and #o.backgrounds > 50 and #o.filters > 5 and o.poses[1].key and o.poses[1].label,
+    "options for a simple Create")
+  local got
+  api.CurrentOutfitLook(function(s, transmog) got = s end)
+  API_OUTFIT = function() return got end
+`);
+await Tick(1, 10);
+await C.run(`
+  local api = WowstagramAPI
+  local p
+  for _, q in ipairs(api.List("all")) do if q.caption == "from the phone" then p = q end end
+  check(p ~= nil, "it reached another player")
+  api.Like(p.id, true)
+  api.Comment(p.id, "nice phone pic")
+  api.Comment(p.id, "   ")
+  check(api.Liked(p) and api.Likes(p) == 1 and #api.Comments(p) == 1, "liked and commented through it (an empty comment is ignored)")
+  api.Edit(p.id, "not mine to change")
+  api.Delete(p.id)
+  check(api.Find(p.id) and p.caption == "from the phone", "someone else's picture can't be edited or deleted")
+  api.Save("no-such-post", true)
+  check(not api.Saved("no-such-post"), "only real pictures can be saved")
+`);
+await Tick(1, 10);
+await A.run(`
+  local api = WowstagramAPI
+  local p = api.Find(API_POST)
+  check(api.Likes(p) == 1 and #api.Comments(p) == 1, "the like and comment came back to the poster")
+  check(API_CHANGED() > 0, "OnChange told the other addon (a broken listener didn't stop it)")
+  local outfit = API_OUTFIT()
+  check(outfit and api.Decode(outfit).race, "your current outfit as a look")
+  api.Edit(API_POST, "edited on the phone")
+  check(p.caption == "edited on the phone", "your own picture edited")
+  api.Delete(API_POST)
+  check(api.Find(API_POST) == nil, "and deleted")
+`);
+
 section('Sharing off');
 await B.run(`
   ns.Social.SetNetwork(false)
@@ -1636,7 +1689,7 @@ await D.run(`
 // Globals: only the ones an addon needs.
 {
   const allowed = new Set(['WowstagramDB', 'SLASH_WOWSTAGRAM1', 'SLASH_WOWSTAGRAM2', 'WowstagramMinimapButton',
-    'WowstagramScreenshot', 'WowstagramWall']);
+    'WowstagramScreenshot', 'WowstagramWall', 'WowstagramAPI']);
   const found = new Map();
   for (const p of players) {
     await p.run(`__GL = {} for k, src in pairs(__ADDON_GLOBALS) do table.insert(__GL, k .. " (" .. src .. ")") end`);

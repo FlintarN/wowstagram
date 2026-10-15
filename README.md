@@ -54,6 +54,19 @@ Pictures go to everyone with Wowstagram on your realm and in your guild (on Reta
 
 **Safe by design.** Only you can edit or delete your things, and nobody can like or comment in your name. Pictures, comments and likes passed on by others are checked with their owner in the background; anything made up disappears, and whoever made it up is shut out. Nobody's colour codes, textures or links work in captions, comments or bios.
 
+## For addon developers
+
+Other addons can use Wowstagram through one global, `WowstagramAPI` (HearthPhone uses it to show Wowstagram as a phone app). It's there once Wowstagram has loaded; `WowstagramAPI.VERSION` (now 1) only goes up when an existing function changes.
+
+- **Who:** `Me()`, `Display(id)`, `ColorName(id, class)`
+- **Reading:** `Feed()`, `List(filter)`, `Find(id)`, `Comments(post)`, `Likes(post)`, `Liked(post, name)`, `Profile(name)`, `Following(name)`, `Saved(id)`, `HasGuild()`, `IsMine(post)`, `NetworkOn()`
+- **Actions:** `Post(lookString, caption, share)`, `Edit(id, caption, lookString)`, `Delete(id)`, `Like(id, on)`, `Comment(id, text)`, `DeleteComment(id, author, t)`, `Follow(name, on)`, `Save(id, on)`
+- **Changes:** `OnChange(fn)`
+- **Pictures:** `NewPicture(parent, w, h, opts)`, `NewScroller(parent, opts)`, `RefreshPictures()`
+- **Create:** `Decode(lookString)`, `Encode(look)`, `CurrentOutfitLook(cb)`, `Options()`, `Open(page, arg)`
+
+Actions go through the same checks as Wowstagram's own buttons. Posts come back as Wowstagram's own tables: read them, don't change them. The details are in `Core/API.lua`.
+
 ## License
 
 MIT, see LICENSE.

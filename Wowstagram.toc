@@ -25,3 +25,4 @@ UI\Activity.lua
 UI\Settings.lua
 UI\Minimap.lua
 UI\Main.lua
+Core\API.lua

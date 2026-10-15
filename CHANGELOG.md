@@ -2,6 +2,7 @@
 
 ## Next
 
+- `WowstagramAPI`: other addons can show Wowstagram and use it (HearthPhone shows it as a phone app). See README.
 - Switching the demo people off removes every trace of them: their notifications, your follows and bookmarks of them, and their profiles.
 
 ## 1.0.2

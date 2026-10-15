@@ -128,13 +128,91 @@ end
 -- What a simple Create can offer: { poses, framings, backgrounds, filters },
 -- each a list of { key, label }. Set them on a look (look.pose,
 -- look.frame, look.bg, look.filter) and Encode it.
+-- Also (added later, same VERSION): motions (look.motion), overlays
+-- (look.overlay), decos (look.deco, Studio's "Frame"), lenses (look.lens),
+-- faces (look.face), stickers (look.stickers: { key, x, y, s, r }, at most
+-- maxStickers) and textStyles (look.text = { text, style, y }, at most
+-- maxText letters). Sticker and lens entries carry their icon texture as
+-- `icon` when there is one.
 function API.Options()
     local function List(defs)
         local out = {}
-        for _, d in ipairs(defs) do out[#out + 1] = { key = d.key, label = d.name } end
+        for _, d in ipairs(defs) do
+            local icon = d.icon
+            if type(icon) ~= "string" then icon = d.tex end
+            out[#out + 1] = { key = d.key, label = d.name, icon = icon, coords = d.coords, color = d.color }
+        end
         return out
     end
-    return { poses = List(L.POSES), framings = List(L.FRAMES), backgrounds = List(L.BACKGROUNDS), filters = List(L.FILTERS) }
+    return { poses = List(L.POSES), framings = List(L.FRAMES), backgrounds = List(L.BACKGROUNDS), filters = List(L.FILTERS),
+        motions = List(L.MOTIONS), overlays = List(L.OVERLAYS), decos = List(L.DECOS), lenses = List(L.LENSES),
+        faces = List(L.FACES), stickers = List(L.STICKERS), textStyles = List(L.TEXT_STYLES),
+        maxStickers = L.MAX_STICKERS, maxText = L.MAX_TEXT, maxPeople = L.MAX_PEOPLE }
+end
+
+-- People for a group picture: who can be added now (your target, then your
+-- group), as { unit, id }.
+function API.Candidates()
+    local out, seen = {}, {}
+    local function Try(unit)
+        if not (UnitExists and UnitExists(unit) and (not UnitIsPlayer or UnitIsPlayer(unit))) then return end
+        local id = ns.UnitId(unit)
+        if not id or id == ns.Me() or seen[id] then return end
+        seen[id] = true
+        out[#out + 1] = { unit = unit, id = id }
+    end
+    Try("target")
+    local raid = IsInRaid and IsInRaid()
+    for i = 1, (GetNumGroupMembers and GetNumGroupMembers() or 0) do Try(raid and ("raid" .. i) or ("party" .. i)) end
+    return out
+end
+
+-- Everyone spread evenly across the picture, stepping back a little for
+-- each extra person (as Studio does).
+local function Arrange(look)
+    local all = { look }
+    for _, q in ipairs(look.people) do all[#all + 1] = q end
+    local n = #all
+    local step = math.min(0.3, 0.8 / n)
+    for k, p in ipairs(all) do
+        p.mx = (k - (n + 1) / 2) * step
+        p.my = 0
+    end
+    look.zoom = math.max(50, 100 - 14 * (n - 1))
+end
+
+-- Add the player on `unit` to a look (a table from Decode): their body,
+-- race and current outfit. cb() once their outfit has been read. Returns
+-- true when they were added.
+function API.AddPerson(look, unit, cb)
+    if type(look) ~= "table" then return false end
+    look.people = look.people or {}
+    if #look.people >= L.MAX_PEOPLE - 1 then return false end
+    local id = ns.UnitId(unit)
+    if not id or id == ns.Me() then return false end
+    for _, q in ipairs(look.people) do if q.name == id then return false end end
+    local _, _, race = UnitRace(unit)
+    local _, class = UnitClass(unit)
+    local q = L.NewPerson(id, race, UnitSex and UnitSex(unit), class)
+    table.insert(look.people, q)
+    Arrange(look)
+    P.ReadOutfitOf(unit, function(slots)
+        q.slots = slots or {}
+        if type(cb) == "function" then cb() end
+    end)
+    return true
+end
+
+-- Take someone (by id) out of a look again.
+function API.RemovePerson(look, id)
+    if type(look) ~= "table" then return end
+    for i, q in ipairs(look.people or {}) do
+        if q.name == id then
+            table.remove(look.people, i)
+            Arrange(look)
+            return
+        end
+    end
 end
 
 -- Open the full Wowstagram window on a page: "feed", "search", "studio",

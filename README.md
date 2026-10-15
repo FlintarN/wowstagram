@@ -63,7 +63,7 @@ Other addons can use Wowstagram through one global, `WowstagramAPI` (HearthPhone
 - **Actions:** `Post(lookString, caption, share)`, `Edit(id, caption, lookString)`, `Delete(id)`, `Like(id, on)`, `Comment(id, text)`, `DeleteComment(id, author, t)`, `Follow(name, on)`, `Save(id, on)`
 - **Changes:** `OnChange(fn)`
 - **Pictures:** `NewPicture(parent, w, h, opts)`, `NewScroller(parent, opts)`, `RefreshPictures()`
-- **Create:** `Decode(lookString)`, `Encode(look)`, `CurrentOutfitLook(cb)`, `Options()`, `Open(page, arg)`
+- **Create:** `Decode(lookString)`, `Encode(look)`, `CurrentOutfitLook(cb)`, `Options()`, `Candidates()`, `AddPerson(look, unit, cb)`, `RemovePerson(look, id)`, `Open(page, arg)`
 
 Actions go through the same checks as Wowstagram's own buttons. Posts come back as Wowstagram's own tables: read them, don't change them. The details are in `Core/API.lua`.
 

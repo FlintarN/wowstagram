@@ -1636,6 +1636,20 @@ await A.run(`
   local o = api.Options()
   check(#o.poses > 5 and #o.framings == 3 and #o.backgrounds > 50 and #o.filters > 5 and o.poses[1].key and o.poses[1].label,
     "options for a simple Create")
+  check(#o.stickers > 5 and #o.lenses > 3 and #o.textStyles > 3 and o.maxPeople == ns.Look.MAX_PEOPLE, "and the extras: stickers, lenses, text...")
+  -- Group pictures.
+  GROUP = { "Mira Dawnfeather" }
+  local c = api.Candidates()
+  check(#c == 1 and c[1].unit == "party1" and c[1].id == "Mira Dawnfeather", "who can be added")
+  local g = api.Decode(api.Encode(look))
+  local read = false
+  check(api.AddPerson(g, "party1", function() read = true end), "a party member added")
+  check(not api.AddPerson(g, "party1"), "not twice")
+  check(#g.people == 1 and g.people[1].name == "Mira Dawnfeather" and g.mx ~= 0, "in the picture, spaced out")
+  API_READ = function() return read end
+  api.RemovePerson(g, "Mira Dawnfeather")
+  check(#g.people == 0 and g.mx == 0, "and taken out again")
+  GROUP = {}
   local got
   api.CurrentOutfitLook(function(s, transmog) got = s end)
   API_OUTFIT = function() return got end
@@ -1664,6 +1678,7 @@ await A.run(`
   check(API_CHANGED() > 0, "OnChange told the other addon (a broken listener didn't stop it)")
   local outfit = API_OUTFIT()
   check(outfit and api.Decode(outfit).race, "your current outfit as a look")
+  check(API_READ(), "the added person's outfit was read")
   api.Edit(API_POST, "edited on the phone")
   check(p.caption == "edited on the phone", "your own picture edited")
   api.Delete(API_POST)
